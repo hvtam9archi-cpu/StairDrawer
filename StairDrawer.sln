@@ -1,0 +1,22 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StairDrawer", "StairDrawer.csproj", "{5A2FB1C4-01FC-4D09-A1E8-4C7BA65AD48B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5A2FB1C4-01FC-4D09-A1E8-4C7BA65AD48B}.Debug|x64.ActiveCfg = Debug|x64
+		{5A2FB1C4-01FC-4D09-A1E8-4C7BA65AD48B}.Debug|x64.Build.0 = Debug|x64
+		{5A2FB1C4-01FC-4D09-A1E8-4C7BA65AD48B}.Release|x64.ActiveCfg = Release|x64
+		{5A2FB1C4-01FC-4D09-A1E8-4C7BA65AD48B}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

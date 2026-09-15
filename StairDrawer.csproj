@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>StairDrawer</RootNamespace>
+    <AssemblyName>StairDrawer</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <Prefer32Bit>false</Prefer32Bit>
+    <LangVersion>7.3</LangVersion>
+    <AutoCADManagedDir Condition="'$(AutoCADManagedDir)' == ''">$(ACAD_MANAGED_DIR)</AutoCADManagedDir>
+    <AutoCADExecutable Condition="'$(AutoCADExecutable)' == '' and Exists('$(AutoCADManagedDir)\acad.exe')">$(AutoCADManagedDir)\acad.exe</AutoCADExecutable>
+    <AutoCADDebugScriptPath>$(MSBuildProjectDirectory)\bin\$(Platform)\$(Configuration)\$(TargetFramework)\start.scr</AutoCADDebugScriptPath>
+    <CreateAutoCADBundle Condition="'$(CreateAutoCADBundle)' == ''">true</CreateAutoCADBundle>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and Exists('$(AutoCADExecutable)')">
+    <StartAction>Program</StartAction>
+    <StartProgram>$(AutoCADExecutable)</StartProgram>
+    <StartArguments>/nologo /b &quot;$(AutoCADDebugScriptPath)&quot;</StartArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="AcCoreMgd">
+      <HintPath>$(AutoCADManagedDir)\AcCoreMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcDbMgd">
+      <HintPath>$(AutoCADManagedDir)\AcDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcMgd">
+      <HintPath>$(AutoCADManagedDir)\AcMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="ValidateAutoCADReferences" BeforeTargets="ResolveAssemblyReferences"
+          Condition="!Exists('$(AutoCADManagedDir)\AcMgd.dll')">
+    <Error Text="Khong tim thay AutoCAD managed DLL. Dat bien moi truong ACAD_MANAGED_DIR hoac build voi /p:AutoCADManagedDir=&quot;...AutoCAD 2021&quot;." />
+  </Target>
+
+  <Target Name="CreateBundle" AfterTargets="Build" Condition="'$(CreateAutoCADBundle)' == 'true'">
+    <PropertyGroup>
+      <BundleOutputDir Condition="'$(BundleOutputDir)' == ''">$(TargetDir)StairDrawer.bundle</BundleOutputDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(BundleOutputDir)\Contents\Windows" />
+    <Copy SourceFiles="$(ProjectDir)PackageContents.xml" DestinationFolder="$(BundleOutputDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BundleOutputDir)\Contents\Windows" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb"
+          DestinationFolder="$(BundleOutputDir)\Contents\Windows"
+          Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+  </Target>
+
+  <Target Name="GenerateAutoCADDebugScript" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <ItemGroup>
+      <AutoCADDebugScriptLine Include="_.NETLOAD" />
+      <AutoCADDebugScriptLine Include="&quot;$(TargetPath)&quot;" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(AutoCADDebugScriptPath)"
+                      Lines="@(AutoCADDebugScriptLine)"
+                      Overwrite="true"
+                      Encoding="UTF-8" />
+  </Target>
+</Project>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0"
+                    AutodeskProduct="AutoCAD"
+                    ProductType="Application"
+                    Name="StairDrawer"
+                    Description="Ve mat bang va mat cat cau thang"
+                    AppVersion="1.0.0"
+                    ProductCode="{9A15060B-EA31-43EF-9A22-E71755ECD084}">
+  <CompanyDetails Name="StairDrawer" />
+  <Components Description="StairDrawer commands">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.0" SeriesMax="R24.0" />
+    <ComponentEntry AppName="StairDrawer"
+                    Version="1.0.0"
+                    ModuleName="./Contents/Windows/StairDrawer.dll"
+                    AppDescription="Ve mat bang va mat cat cau thang"
+                    LoadOnAutoCADStartup="True"
+                    LoadOnCommandInvocation="True" />
+  </Components>
+</ApplicationPackage>
