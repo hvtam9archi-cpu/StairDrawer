@@ -21,7 +21,9 @@ namespace StairDrawer.Models
             double flightGap,
             double planCutHeight)
         {
-            if (floorHeight <= 0.0)
+            StairParameterValidation.ValidatePlanType(planType);
+
+            if (!NumericValidation.IsFinite(floorHeight) || floorHeight <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(floorHeight));
             }
@@ -32,27 +34,31 @@ namespace StairDrawer.Models
                 throw new ArgumentOutOfRangeException(nameof(totalRisers));
             }
 
-            if (treadDepth <= 0.0)
+            if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(treadDepth));
             }
 
-            if (stairWidth <= 0.0)
+            if (!NumericValidation.IsFinite(stairWidth) || stairWidth <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(stairWidth));
             }
 
-            if (planType != StairPlanType.Straight && landingDepth < stairWidth)
+            if (!NumericValidation.IsFinite(landingDepth)
+                || landingDepth <= 0.0
+                || (planType != StairPlanType.Straight && landingDepth < stairWidth))
             {
                 throw new ArgumentOutOfRangeException(nameof(landingDepth), "Landing depth must not be smaller than stair width.");
             }
 
-            if (flightGap < 0.0)
+            if (!NumericValidation.IsFinite(flightGap) || flightGap < 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(flightGap));
             }
 
-            if (planCutHeight <= 0.0 || planCutHeight >= floorHeight)
+            if (!NumericValidation.IsFinite(planCutHeight)
+                || planCutHeight <= 0.0
+                || planCutHeight >= floorHeight)
             {
                 throw new ArgumentOutOfRangeException(nameof(planCutHeight));
             }
@@ -89,57 +95,57 @@ namespace StairDrawer.Models
     internal sealed class StairSectionParameters
     {
         public StairSectionParameters(
+            StairPlanType planType,
             double floorHeight,
             int totalRisers,
             double treadDepth,
             double landingLength,
             double waistSlabThickness,
-            double finishThickness,
-            double concreteCover)
+            double finishThickness)
         {
-            if (floorHeight <= 0.0)
+            StairParameterValidation.ValidatePlanType(planType);
+
+            if (!NumericValidation.IsFinite(floorHeight) || floorHeight <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(floorHeight));
             }
 
-            if (totalRisers < 2)
+            int minimumRisers = planType == StairPlanType.Straight ? 2 : 4;
+            if (totalRisers < minimumRisers)
             {
                 throw new ArgumentOutOfRangeException(nameof(totalRisers));
             }
 
-            if (treadDepth <= 0.0)
+            if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(treadDepth));
             }
 
-            if (landingLength <= 0.0)
+            if (!NumericValidation.IsFinite(landingLength) || landingLength <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(landingLength));
             }
 
-            if (waistSlabThickness <= 0.0)
+            if (!NumericValidation.IsFinite(waistSlabThickness) || waistSlabThickness <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(waistSlabThickness));
             }
 
-            if (finishThickness < 0.0)
+            if (!NumericValidation.IsFinite(finishThickness) || finishThickness <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(finishThickness));
             }
 
-            if (concreteCover <= 0.0 || concreteCover >= waistSlabThickness)
-            {
-                throw new ArgumentOutOfRangeException(nameof(concreteCover));
-            }
-
+            PlanType = planType;
             FloorHeight = floorHeight;
             TotalRisers = totalRisers;
             TreadDepth = treadDepth;
             LandingLength = landingLength;
             WaistSlabThickness = waistSlabThickness;
             FinishThickness = finishThickness;
-            ConcreteCover = concreteCover;
         }
+
+        public StairPlanType PlanType { get; }
 
         public double FloorHeight { get; }
 
@@ -153,8 +159,27 @@ namespace StairDrawer.Models
 
         public double FinishThickness { get; }
 
-        public double ConcreteCover { get; }
-
         public double RiserHeight => FloorHeight / TotalRisers;
+    }
+
+    internal static class StairParameterValidation
+    {
+        public static void ValidatePlanType(StairPlanType planType)
+        {
+            if (planType != StairPlanType.Straight
+                && planType != StairPlanType.LShape
+                && planType != StairPlanType.UShape)
+            {
+                throw new ArgumentOutOfRangeException(nameof(planType));
+            }
+        }
+    }
+
+    internal static class NumericValidation
+    {
+        public static bool IsFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
     }
 }

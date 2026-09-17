@@ -7,6 +7,7 @@ using StairDrawer.Geometry;
 using StairDrawer.Interaction;
 using StairDrawer.Models;
 using StairDrawer.Services;
+using StairDrawer.UI;
 using AutoCADException = Autodesk.AutoCAD.Runtime.Exception;
 
 namespace StairDrawer.Commands
@@ -25,64 +26,73 @@ namespace StairDrawer.Commands
         [CommandMethod(CommandNames.Draw, CommandFlags.Modal)]
         public void DrawStair()
         {
-            ExecuteSafely(
-                CommandNames.Draw,
-                document =>
-                {
-                    if (!StairInteraction.TryGetDrawingMode(document.Editor, out StairDrawingMode mode))
-                    {
-                        return;
-                    }
-
-                    if (mode == StairDrawingMode.Plan)
-                    {
-                        DrawPlanCore(document);
-                    }
-                    else
-                    {
-                        DrawSectionCore(document);
-                    }
-                });
+            ExecuteSafely(CommandNames.Draw, document => ShowConfigurationWindow(
+                document,
+                StairDrawingMode.Plan,
+                true));
         }
 
         [CommandMethod(CommandNames.DrawPlan, CommandFlags.Modal)]
         public void DrawPlan()
         {
-            ExecuteSafely(CommandNames.DrawPlan, DrawPlanCore);
+            ExecuteSafely(CommandNames.DrawPlan, document => ShowConfigurationWindow(
+                document,
+                StairDrawingMode.Plan,
+                false));
         }
 
         [CommandMethod(CommandNames.DrawSection, CommandFlags.Modal)]
         public void DrawSection()
         {
-            ExecuteSafely(CommandNames.DrawSection, DrawSectionCore);
+            ExecuteSafely(CommandNames.DrawSection, document => ShowConfigurationWindow(
+                document,
+                StairDrawingMode.Section,
+                false));
         }
 
-        private void DrawPlanCore(Document document)
+        private void ShowConfigurationWindow(
+            Document document,
+            StairDrawingMode initialDrawingMode,
+            bool allowDrawingModeSelection)
         {
-            Editor editor = document.Editor;
-            if (!StairInteraction.TryGetPlanParameters(editor, out StairPlanParameters parameters)
-                || !StairInteraction.TryGetPlacement(editor, out StairPlacement placement))
+            var window = new StairConfigurationWindow(initialDrawingMode, allowDrawingModeSelection);
+            bool? dialogResult = Application.ShowModalWindow(window);
+            StairDrawingConfiguration configuration = window.Configuration;
+            if (dialogResult != true
+                || configuration == null
+                || !StairInteraction.TryGetPlacement(document.Editor, out StairPlacement placement))
             {
                 return;
             }
 
-            DrawingModel drawing = StairPlanGeometry.Create(parameters);
-            int count = _drawingService.Draw(document.Database, drawing, placement);
-            editor.WriteMessage("\nDa ve mat bang cau thang ({0} doi tuong).", count);
-        }
-
-        private void DrawSectionCore(Document document)
-        {
-            Editor editor = document.Editor;
-            if (!StairInteraction.TryGetSectionParameters(editor, out StairSectionParameters parameters)
-                || !StairInteraction.TryGetPlacement(editor, out StairPlacement placement))
+            DrawingModel drawing;
+            string drawingLabel;
+            double riserHeight;
+            if (configuration.DrawingMode == StairDrawingMode.Plan)
             {
-                return;
+                drawing = StairPlanGeometry.Create(configuration.PlanParameters);
+                drawingLabel = "mat bang";
+                riserHeight = configuration.PlanParameters.RiserHeight;
+            }
+            else
+            {
+                drawing = StairSectionGeometry.Create(configuration.SectionParameters);
+                drawingLabel = "mat cat";
+                riserHeight = configuration.SectionParameters.RiserHeight;
             }
 
-            DrawingModel drawing = StairSectionGeometry.Create(parameters);
             int count = _drawingService.Draw(document.Database, drawing, placement);
-            editor.WriteMessage("\nDa ve mat cat cau thang ({0} doi tuong).", count);
+            document.Editor.WriteMessage(
+                "\nDa ve {0} cau thang ({1} doi tuong).",
+                drawingLabel,
+                count);
+
+            if (riserHeight < 120.0 || riserHeight > 200.0)
+            {
+                document.Editor.WriteMessage(
+                    "\nCanh bao: chieu cao co bac {0:0.#} nam ngoai khoang tham khao 120-200.",
+                    riserHeight);
+            }
         }
 
         private static void ExecuteSafely(string commandName, Action<Document> action)

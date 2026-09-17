@@ -6,9 +6,24 @@ namespace StairDrawer.Geometry
 {
     internal static class StairPlanGeometry
     {
-        private const double PlanTextHeight = 120.0;
-        private const double ArrowGlobalWidth = 50.0;
+        private const double MinimumPlanTextHeight = 100.0;
+        private const double MaximumPlanTextHeight = 180.0;
+        private const double PlanTextHeightRatio = 0.16;
+        private const double OuterNumberOffsetRatio = 0.12;
+        private const double OppositeOuterNumberOffsetRatio = 0.88;
         private const double HiddenLinetypeScale = 2.0;
+        private const double DirectionStartLength = 150.0;
+        private const double DirectionArrowLengthRatio = 0.22;
+        private const double DirectionArrowHalfWidthRatio = 0.34;
+        private const double DirectionStrokeWidth = 45.0;
+        private const double CutFirstShoulderWidthRatio = 0.427;
+        private const double CutFirstToothWidthRatio = 0.440;
+        private const double CutSecondToothWidthRatio = 0.560;
+        private const double CutSecondShoulderWidthRatio = 0.573;
+        private const double CutFirstShoulderRunRatio = 0.364;
+        private const double CutFirstToothRunRatio = 0.800;
+        private const double CutSecondToothRunRatio = 0.067;
+        private const double CutSecondShoulderRunRatio = 0.503;
 
         private static readonly Point2 AxisX = new Point2(1.0, 0.0);
         private static readonly Point2 AxisY = new Point2(0.0, 1.0);
@@ -45,6 +60,8 @@ namespace StairDrawer.Geometry
         private static void CreateStraightPlan(DrawingModel drawing, StairPlanParameters parameters)
         {
             double run = GetFlightRun(parameters.TotalRisers, parameters.TreadDepth);
+            double textHeight = GetPlanTextHeight(parameters.StairWidth);
+
             AddFlight(
                 drawing,
                 new Point2(0.0, 0.0),
@@ -53,12 +70,18 @@ namespace StairDrawer.Geometry
                 parameters.TotalRisers,
                 1,
                 0.0,
-                parameters,
-                "LEN");
+                OuterNumberOffsetRatio,
+                textHeight,
+                parameters);
 
-            AddLevelText(drawing, new Point2(0.0, parameters.StairWidth + (PlanTextHeight * 1.2)), 0.0);
-            AddLevelText(drawing, new Point2(run, parameters.StairWidth + (PlanTextHeight * 1.2)), parameters.FloorHeight);
-            AddSummary(drawing, new Point2(0.0, -PlanTextHeight * 1.8), "MAT BANG THANG THANG", parameters);
+            AddDirectionPath(
+                drawing,
+                new[]
+                {
+                    new Point2(0.0, parameters.StairWidth * 0.5),
+                    new Point2(run, parameters.StairWidth * 0.5)
+                },
+                parameters.StairWidth);
         }
 
         private static void CreateLPlan(DrawingModel drawing, StairPlanParameters parameters)
@@ -67,6 +90,7 @@ namespace StairDrawer.Geometry
             double firstRun = GetFlightRun(firstFlightRisers, parameters.TreadDepth);
             double secondRun = GetFlightRun(secondFlightRisers, parameters.TreadDepth);
             double landingElevation = firstFlightRisers * parameters.RiserHeight;
+            double textHeight = GetPlanTextHeight(parameters.StairWidth);
 
             AddFlight(
                 drawing,
@@ -76,8 +100,9 @@ namespace StairDrawer.Geometry
                 firstFlightRisers,
                 1,
                 0.0,
-                parameters,
-                "VE 1 LEN");
+                OuterNumberOffsetRatio,
+                textHeight,
+                parameters);
 
             AddRectangle(
                 drawing,
@@ -86,7 +111,8 @@ namespace StairDrawer.Geometry
                 parameters.StairWidth,
                 GetPlanLineLayer(landingElevation, parameters.PlanCutHeight));
 
-            Point2 secondFlightStart = new Point2(firstRun, parameters.StairWidth);
+            double secondFlightOffset = (parameters.LandingDepth - parameters.StairWidth) * 0.5;
+            Point2 secondFlightStart = new Point2(firstRun + secondFlightOffset, parameters.StairWidth);
             AddFlight(
                 drawing,
                 secondFlightStart,
@@ -95,18 +121,20 @@ namespace StairDrawer.Geometry
                 secondFlightRisers,
                 firstFlightRisers + 1,
                 landingElevation,
-                parameters,
-                "VE 2 LEN");
+                OppositeOuterNumberOffsetRatio,
+                textHeight,
+                parameters);
 
-            AddLevelText(
+            double secondFlightCenterX = secondFlightStart.X + (parameters.StairWidth * 0.5);
+            AddDirectionPath(
                 drawing,
-                new Point2(firstRun + (parameters.LandingDepth * 0.15), parameters.StairWidth * 0.45),
-                landingElevation);
-            AddLevelText(
-                drawing,
-                secondFlightStart + (AxisY * secondRun) + (AxisX * (parameters.StairWidth * 0.15)),
-                parameters.FloorHeight);
-            AddSummary(drawing, new Point2(0.0, -PlanTextHeight * 1.8), "MAT BANG THANG CHU L", parameters);
+                new[]
+                {
+                    new Point2(0.0, parameters.StairWidth * 0.5),
+                    new Point2(secondFlightCenterX, parameters.StairWidth * 0.5),
+                    new Point2(secondFlightCenterX, parameters.StairWidth + secondRun)
+                },
+                parameters.StairWidth);
         }
 
         private static void CreateUPlan(DrawingModel drawing, StairPlanParameters parameters)
@@ -117,6 +145,7 @@ namespace StairDrawer.Geometry
             double maximumRun = Math.Max(firstRun, secondRun);
             double totalWidth = (parameters.StairWidth * 2.0) + parameters.FlightGap;
             double landingElevation = firstFlightRisers * parameters.RiserHeight;
+            double textHeight = GetPlanTextHeight(parameters.StairWidth);
             Point2 firstFlightStart = new Point2(maximumRun - firstRun, 0.0);
 
             AddFlight(
@@ -127,8 +156,9 @@ namespace StairDrawer.Geometry
                 firstFlightRisers,
                 1,
                 0.0,
-                parameters,
-                "VE 1 LEN");
+                OuterNumberOffsetRatio,
+                textHeight,
+                parameters);
 
             AddRectangle(
                 drawing,
@@ -148,18 +178,25 @@ namespace StairDrawer.Geometry
                 secondFlightRisers,
                 firstFlightRisers + 1,
                 landingElevation,
-                parameters,
-                "VE 2 LEN");
+                OppositeOuterNumberOffsetRatio,
+                textHeight,
+                parameters);
 
-            AddLevelText(
+            double firstFlightCenterY = parameters.StairWidth * 0.5;
+            double secondFlightCenterY = parameters.StairWidth
+                + parameters.FlightGap
+                + (parameters.StairWidth * 0.5);
+            double landingCenterX = maximumRun + (parameters.LandingDepth * 0.5);
+            AddDirectionPath(
                 drawing,
-                new Point2(maximumRun + (parameters.LandingDepth * 0.15), totalWidth * 0.45),
-                landingElevation);
-            AddLevelText(
-                drawing,
-                secondFlightStart + (new Point2(-1.0, 0.0) * secondRun) + (AxisY * (parameters.StairWidth * 0.15)),
-                parameters.FloorHeight);
-            AddSummary(drawing, new Point2(0.0, -PlanTextHeight * 1.8), "MAT BANG THANG CHU U", parameters);
+                new[]
+                {
+                    new Point2(firstFlightStart.X, firstFlightCenterY),
+                    new Point2(landingCenterX, firstFlightCenterY),
+                    new Point2(landingCenterX, secondFlightCenterY),
+                    new Point2(maximumRun - secondRun, secondFlightCenterY)
+                },
+                parameters.StairWidth);
         }
 
         private static void AddFlight(
@@ -170,8 +207,9 @@ namespace StairDrawer.Geometry
             int risers,
             int firstRiserNumber,
             double flightStartElevation,
-            StairPlanParameters parameters,
-            string label)
+            double numberOffsetRatio,
+            double textHeight,
+            StairPlanParameters parameters)
         {
             direction = direction.Normalize();
             widthDirection = widthDirection.Normalize();
@@ -184,14 +222,26 @@ namespace StairDrawer.Geometry
                 firstTreadElevation,
                 flightEndElevation,
                 parameters.PlanCutHeight);
+            bool hasCut = visibleRun > 1e-6 && visibleRun < run - 1e-6;
+            double firstSideVisibleRun = visibleRun;
+            double secondSideVisibleRun = visibleRun;
+            if (hasCut)
+            {
+                GetCutDistances(
+                    run,
+                    visibleRun,
+                    parameters.TreadDepth,
+                    out firstSideVisibleRun,
+                    out secondSideVisibleRun);
+            }
 
-            AddFlightSide(drawing, start, direction, run, visibleRun);
+            AddFlightSide(drawing, start, direction, run, firstSideVisibleRun);
             AddFlightSide(
                 drawing,
                 start + (widthDirection * parameters.StairWidth),
                 direction,
                 run,
-                visibleRun);
+                secondSideVisibleRun);
 
             AddPlanLine(
                 drawing,
@@ -217,12 +267,18 @@ namespace StairDrawer.Geometry
                     GetPlanLineLayer(riserTopElevation, parameters.PlanCutHeight));
             }
 
-            if (visibleRun > 1e-6 && visibleRun < run - 1e-6)
+            if (hasCut)
             {
-                AddCutMark(drawing, start, direction, widthDirection, visibleRun, parameters);
+                AddCutMark(
+                    drawing,
+                    start,
+                    direction,
+                    widthDirection,
+                    firstSideVisibleRun,
+                    secondSideVisibleRun,
+                    parameters.StairWidth);
             }
 
-            AddDirectionArrow(drawing, start, direction, widthDirection, run, parameters.StairWidth, label);
             AddRiserNumbers(
                 drawing,
                 start,
@@ -232,7 +288,9 @@ namespace StairDrawer.Geometry
                 risers,
                 firstRiserNumber,
                 parameters.TreadDepth,
-                parameters.StairWidth);
+                parameters.StairWidth,
+                numberOffsetRatio,
+                textHeight);
         }
 
         private static void AddFlightSide(
@@ -271,67 +329,92 @@ namespace StairDrawer.Geometry
             Point2 flightStart,
             Point2 direction,
             Point2 widthDirection,
-            double cutDistance,
-            StairPlanParameters parameters)
+            double firstSideCutDistance,
+            double secondSideCutDistance,
+            double stairWidth)
         {
-            Point2 cutBase = flightStart + (direction * cutDistance);
-            double offset = Math.Min(parameters.TreadDepth * 0.35, parameters.StairWidth * 0.08);
+            double cutRun = firstSideCutDistance - secondSideCutDistance;
+            Point2 cutStart = flightStart + (direction * firstSideCutDistance);
             drawing.Polylines.Add(new PolylinePrimitive(
                 new[]
                 {
-                    cutBase + (direction * offset),
-                    cutBase + (widthDirection * (parameters.StairWidth * 0.35)) - (direction * offset),
-                    cutBase + (widthDirection * (parameters.StairWidth * 0.65)) + (direction * offset),
-                    cutBase + (widthDirection * parameters.StairWidth) - (direction * offset)
+                    cutStart,
+                    cutStart
+                        + (widthDirection * (stairWidth * CutFirstShoulderWidthRatio))
+                        - (direction * (cutRun * CutFirstShoulderRunRatio)),
+                    cutStart
+                        + (widthDirection * (stairWidth * CutFirstToothWidthRatio))
+                        - (direction * (cutRun * CutFirstToothRunRatio)),
+                    cutStart
+                        + (widthDirection * (stairWidth * CutSecondToothWidthRatio))
+                        - (direction * (cutRun * CutSecondToothRunRatio)),
+                    cutStart
+                        + (widthDirection * (stairWidth * CutSecondShoulderWidthRatio))
+                        - (direction * (cutRun * CutSecondShoulderRunRatio)),
+                    flightStart
+                        + (direction * secondSideCutDistance)
+                        + (widthDirection * stairWidth)
                 },
                 false,
-                StairLayers.PlanCut));
-
-            drawing.Texts.Add(new TextPrimitive(
-                cutBase + (widthDirection * (parameters.StairWidth + (PlanTextHeight * 0.45))),
-                string.Format(CultureInfo.InvariantCulture, "MC +{0:0.000}", parameters.PlanCutHeight / 1000.0),
-                PlanTextHeight,
-                0.0,
-                StairLayers.PlanText));
+                StairLayers.PlanCut,
+                drawOnTop: true));
         }
 
-        private static void AddDirectionArrow(
+        private static void AddDirectionPath(
             DrawingModel drawing,
-            Point2 start,
-            Point2 direction,
-            Point2 widthDirection,
-            double run,
-            double width,
-            string label)
+            Point2[] pathVertices,
+            double stairWidth)
         {
-            Point2 arrowStart = start + (direction * (run * 0.15)) + (widthDirection * (width * 0.5));
-            Point2 arrowEnd = start + (direction * (run * 0.82)) + (widthDirection * (width * 0.5));
-            double arrowLength = Math.Min(240.0, Math.Min(run * 0.15, width * 0.22));
-            double arrowHalfWidth = arrowLength * 0.45;
-            Point2 arrowBack = arrowEnd - (direction * arrowLength);
+            if (pathVertices == null || pathVertices.Length < 2)
+            {
+                throw new ArgumentException("A stair direction path requires at least two vertices.", nameof(pathVertices));
+            }
+
+            Point2 initialDirection = (pathVertices[1] - pathVertices[0]).Normalize();
+            Point2 finalDirection = (pathVertices[pathVertices.Length - 1]
+                - pathVertices[pathVertices.Length - 2]).Normalize();
+            Point2 finalWidthDirection = new Point2(-finalDirection.Y, finalDirection.X);
+            Point2 start = pathVertices[0];
+            Point2 end = pathVertices[pathVertices.Length - 1];
+            double firstSegmentLength = (pathVertices[1] - pathVertices[0]).Length;
+            double finalSegmentLength = (end - pathVertices[pathVertices.Length - 2]).Length;
+            double startLength = Math.Min(DirectionStartLength, firstSegmentLength * 0.30);
+            double arrowLength = Math.Min(
+                stairWidth * DirectionArrowLengthRatio,
+                finalSegmentLength * 0.45);
+            double arrowHalfWidth = Math.Min(
+                stairWidth * DirectionArrowHalfWidthRatio,
+                finalSegmentLength * 0.40);
+            Point2 arrowBack = end - (finalDirection * arrowLength);
 
             drawing.Polylines.Add(new PolylinePrimitive(
-                new[] { arrowStart, arrowBack },
+                pathVertices,
                 false,
                 StairLayers.PlanAnnotation,
-                ArrowGlobalWidth));
+                drawOnTop: true));
+
             drawing.Polylines.Add(new PolylinePrimitive(
                 new[]
                 {
-                    arrowEnd,
-                    arrowBack + (widthDirection * arrowHalfWidth),
-                    arrowBack - (widthDirection * arrowHalfWidth)
+                    start,
+                    start + (initialDirection * startLength)
                 },
-                true,
+                false,
                 StairLayers.PlanAnnotation,
-                ArrowGlobalWidth));
+                DirectionStrokeWidth,
+                drawOnTop: true));
 
-            drawing.Texts.Add(new TextPrimitive(
-                arrowStart + (widthDirection * (PlanTextHeight * 0.55)),
-                label,
-                PlanTextHeight,
-                0.0,
-                StairLayers.PlanText));
+            drawing.Polylines.Add(new PolylinePrimitive(
+                new[]
+                {
+                    arrowBack + (finalWidthDirection * arrowHalfWidth),
+                    end,
+                    arrowBack - (finalWidthDirection * arrowHalfWidth)
+                },
+                false,
+                StairLayers.PlanAnnotation,
+                DirectionStrokeWidth,
+                drawOnTop: true));
         }
 
         private static void AddRiserNumbers(
@@ -343,7 +426,9 @@ namespace StairDrawer.Geometry
             int risers,
             int firstRiserNumber,
             double treadDepth,
-            double width)
+            double width,
+            double numberOffsetRatio,
+            double textHeight)
         {
             for (int localRiserIndex = 1; localRiserIndex <= risers; localRiserIndex++)
             {
@@ -354,17 +439,31 @@ namespace StairDrawer.Geometry
                 }
 
                 double distance = (localRiserIndex - 0.5) * treadDepth;
-                distance = Math.Max(treadDepth * 0.25, Math.Min(run - (treadDepth * 0.25), distance));
+                distance = Math.Max(treadDepth * 0.5, Math.Min(run - (treadDepth * 0.5), distance));
                 Point2 position = start
                     + (direction * distance)
-                    + (widthDirection * (width * 0.16));
+                    + (widthDirection * (width * numberOffsetRatio));
                 drawing.Texts.Add(new TextPrimitive(
                     position,
                     riserNumber.ToString(CultureInfo.InvariantCulture),
-                    PlanTextHeight,
+                    textHeight,
                     0.0,
-                    StairLayers.PlanText));
+                    StairLayers.PlanText,
+                    TextAnchor.MiddleCenter));
             }
+        }
+
+        private static void GetCutDistances(
+            double run,
+            double visibleRun,
+            double treadDepth,
+            out double firstSideVisibleRun,
+            out double secondSideVisibleRun)
+        {
+            double maximumHalfSpan = Math.Min(visibleRun, run - visibleRun);
+            double halfSpan = Math.Min(treadDepth * 0.5, maximumHalfSpan);
+            firstSideVisibleRun = visibleRun + halfSpan;
+            secondSideVisibleRun = visibleRun - halfSpan;
         }
 
         private static void AddRectangle(
@@ -388,35 +487,11 @@ namespace StairDrawer.Geometry
                 layerName == StairLayers.PlanHidden ? HiddenLinetypeScale : 1.0));
         }
 
-        private static void AddLevelText(DrawingModel drawing, Point2 position, double elevation)
+        private static double GetPlanTextHeight(double stairWidth)
         {
-            drawing.Texts.Add(new TextPrimitive(
-                position,
-                string.Format(CultureInfo.InvariantCulture, "CT +{0:0.000}", elevation / 1000.0),
-                PlanTextHeight,
-                0.0,
-                StairLayers.PlanText));
-        }
-
-        private static void AddSummary(
-            DrawingModel drawing,
-            Point2 position,
-            string title,
-            StairPlanParameters parameters)
-        {
-            drawing.Texts.Add(new TextPrimitive(
-                position,
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0} - {1} BAC, h={2:0.#}, b={3:0.#}, MC=+{4:0.000}",
-                    title,
-                    parameters.TotalRisers,
-                    parameters.RiserHeight,
-                    parameters.TreadDepth,
-                    parameters.PlanCutHeight / 1000.0),
-                PlanTextHeight,
-                0.0,
-                StairLayers.PlanText));
+            return Math.Max(
+                MinimumPlanTextHeight,
+                Math.Min(MaximumPlanTextHeight, stairWidth * PlanTextHeightRatio));
         }
 
         private static string GetPlanLineLayer(double elevation, double planCutHeight)

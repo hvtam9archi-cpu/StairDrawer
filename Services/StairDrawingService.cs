@@ -22,7 +22,6 @@ namespace StairDrawer.Services
             new LayerDefinition(StairLayers.Concrete, 1, LineWeight.LineWeight035, "Continuous"),
             new LayerDefinition(StairLayers.Brick, 30, LineWeight.LineWeight018, "Continuous"),
             new LayerDefinition(StairLayers.Finish, 2, LineWeight.LineWeight030, "Continuous"),
-            new LayerDefinition(StairLayers.Rebar, 5, LineWeight.LineWeight040, "Continuous"),
             new LayerDefinition(StairLayers.Annotation, 7, LineWeight.LineWeight018, "Continuous")
         };
 
@@ -61,28 +60,13 @@ namespace StairDrawer.Services
                     database.CurrentSpaceId,
                     OpenMode.ForWrite);
 
-                foreach (PolylinePrimitive primitive in drawing.Polylines)
-                {
-                    var polyline = new Polyline(primitive.Vertices.Count)
-                    {
-                        Closed = primitive.Closed,
-                        Elevation = placement.Origin.Z,
-                        Layer = primitive.LayerName,
-                        LinetypeScale = primitive.LinetypeScale,
-                        Normal = Vector3d.ZAxis
-                    };
-
-                    for (int vertexIndex = 0; vertexIndex < primitive.Vertices.Count; vertexIndex++)
-                    {
-                        Point3d point = transform.ToWorld(primitive.Vertices[vertexIndex]);
-                        polyline.AddVertexAt(vertexIndex, new Point2d(point.X, point.Y), 0.0, 0.0, 0.0);
-                    }
-
-                    polyline.ConstantWidth = primitive.GlobalWidth;
-
-                    AppendEntity(currentSpace, transaction, polyline);
-                    entityCount++;
-                }
+                entityCount += AppendPolylines(
+                    drawing.Polylines,
+                    false,
+                    transform,
+                    placement.Origin.Z,
+                    currentSpace,
+                    transaction);
 
                 foreach (LinePrimitive primitive in drawing.Lines)
                 {
@@ -112,12 +96,21 @@ namespace StairDrawer.Services
                     entityCount++;
                 }
 
+                entityCount += AppendPolylines(
+                    drawing.Polylines,
+                    true,
+                    transform,
+                    placement.Origin.Z,
+                    currentSpace,
+                    transaction);
+
                 double baseRotation = Math.Atan2(xAxis.Y, xAxis.X);
                 foreach (TextPrimitive primitive in drawing.Texts)
                 {
+                    Point3d textPoint = transform.ToWorld(primitive.Position);
                     var text = new DBText
                     {
-                        Position = transform.ToWorld(primitive.Position),
+                        Position = textPoint,
                         Height = primitive.Height,
                         Rotation = baseRotation + primitive.Rotation,
                         TextString = primitive.Text,
@@ -125,7 +118,19 @@ namespace StairDrawer.Services
                         TextStyleId = database.Textstyle
                     };
 
+                    if (primitive.Anchor == TextAnchor.MiddleCenter)
+                    {
+                        text.HorizontalMode = TextHorizontalMode.TextCenter;
+                        text.VerticalMode = TextVerticalMode.TextVerticalMid;
+                        text.AlignmentPoint = textPoint;
+                    }
+
                     AppendEntity(currentSpace, transaction, text);
+                    if (primitive.Anchor == TextAnchor.MiddleCenter)
+                    {
+                        text.AdjustAlignment(database);
+                    }
+
                     entityCount++;
                 }
 
@@ -133,6 +138,60 @@ namespace StairDrawer.Services
             }
 
             return entityCount;
+        }
+
+        private static int AppendPolylines(
+            IEnumerable<PolylinePrimitive> primitives,
+            bool drawOnTop,
+            DrawingTransform transform,
+            double elevation,
+            BlockTableRecord currentSpace,
+            Transaction transaction)
+        {
+            int appendedCount = 0;
+            foreach (PolylinePrimitive primitive in primitives)
+            {
+                if (primitive.DrawOnTop != drawOnTop)
+                {
+                    continue;
+                }
+
+                Polyline polyline = CreatePolyline(primitive, transform, elevation);
+                AppendEntity(currentSpace, transaction, polyline);
+                appendedCount++;
+            }
+
+            return appendedCount;
+        }
+
+        private static Polyline CreatePolyline(
+            PolylinePrimitive primitive,
+            DrawingTransform transform,
+            double elevation)
+        {
+            var polyline = new Polyline(primitive.Vertices.Count);
+            try
+            {
+                polyline.Closed = primitive.Closed;
+                polyline.Elevation = elevation;
+                polyline.Layer = primitive.LayerName;
+                polyline.LinetypeScale = primitive.LinetypeScale;
+                polyline.Normal = Vector3d.ZAxis;
+
+                for (int vertexIndex = 0; vertexIndex < primitive.Vertices.Count; vertexIndex++)
+                {
+                    Point3d point = transform.ToWorld(primitive.Vertices[vertexIndex]);
+                    polyline.AddVertexAt(vertexIndex, new Point2d(point.X, point.Y), 0.0, 0.0, 0.0);
+                }
+
+                polyline.ConstantWidth = primitive.GlobalWidth;
+                return polyline;
+            }
+            catch
+            {
+                polyline.Dispose();
+                throw;
+            }
         }
 
         private static void EnsureLayers(Database database, Transaction transaction)

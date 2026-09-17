@@ -7,6 +7,8 @@
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <Prefer32Bit>false</Prefer32Bit>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
     <LangVersion>7.3</LangVersion>
     <AutoCADManagedDir Condition="'$(AutoCADManagedDir)' == ''">$(ACAD_MANAGED_DIR)</AutoCADManagedDir>
     <AutoCADExecutable Condition="'$(AutoCADExecutable)' == '' and Exists('$(AutoCADManagedDir)\acad.exe')">$(AutoCADManagedDir)\acad.exe</AutoCADExecutable>

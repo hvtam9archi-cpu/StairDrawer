@@ -6,6 +6,16 @@ namespace StairDrawer.Models
     {
         public Point2(double x, double y)
         {
+            if (!NumericValidation.IsFinite(x))
+            {
+                throw new ArgumentOutOfRangeException(nameof(x));
+            }
+
+            if (!NumericValidation.IsFinite(y))
+            {
+                throw new ArgumentOutOfRangeException(nameof(y));
+            }
+
             X = x;
             Y = y;
         }
@@ -19,9 +29,9 @@ namespace StairDrawer.Models
         public Point2 Normalize()
         {
             double length = Length;
-            if (length <= 1e-9)
+            if (!NumericValidation.IsFinite(length) || length <= 1e-9)
             {
-                throw new InvalidOperationException("Cannot normalize a zero-length vector.");
+                throw new InvalidOperationException("Cannot normalize a non-finite or zero-length vector.");
             }
 
             return this / length;

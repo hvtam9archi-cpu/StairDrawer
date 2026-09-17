@@ -4,21 +4,23 @@ Plugin C# cho AutoCAD 2021, target `.NET Framework 4.8` và `x64`.
 
 ## Chức năng
 
-- `STAIRDRAW`: chọn vẽ mặt bằng hoặc mặt cắt.
-- `STAIRPLAN`: vẽ mặt bằng thang thẳng, chữ L hoặc chữ U; phân nét thấy/khuất theo cao độ mặt phẳng cắt, đánh số bậc lẻ, ghi cao độ và tạo mũi tên hướng lên.
-- `STAIRSECTION`: vẽ mặt cắt cấu tạo gồm bản thang BTCT, bậc xây gạch, lớp mặt/cổ bậc và cốt thép minh họa.
+- `STAIRDRAW`: mở giao diện WPF để chọn mặt bằng/mặt cắt, loại thang, xem preview và nhập toàn bộ thông số.
+- `STAIRPLAN`: mở cùng giao diện với loại bản vẽ được khóa ở mặt bằng; hỗ trợ thang thẳng, chữ L hoặc chữ U.
+- `STAIRSECTION`: mở cùng giao diện với loại bản vẽ được khóa ở mặt cắt; hỗ trợ mặt cắt thẳng hoặc mặt cắt triển khai cho thang chữ L/U.
 - Tất cả kích thước nhập theo đơn vị bản vẽ hiện hành; bộ giá trị mặc định được thiết kế cho bản vẽ dùng milimét.
 - Hình học được đặt trên mặt phẳng WCS XY tại cao độ Z của điểm chèn.
+
+Sau khi xác nhận giao diện, AutoCAD chỉ yêu cầu chọn điểm chèn và điểm xác định hướng trục X. Các thông số không còn được hỏi tuần tự tại con trỏ hoặc command line.
 
 Mặt bằng dùng bộ layer tham khảo từ bản vẽ mẫu:
 
 - `ABC_A_NetThay`: đường bao và bậc nằm dưới mặt phẳng cắt.
 - `ABC_A_Khuat`: phần nằm trên mặt phẳng cắt, dùng linetype `HIDDEN` và linetype scale 2.
 - `ABC_A_Netcat`: ký hiệu zíc-zắc tại vị trí mặt phẳng cắt qua vế thang.
-- `ABC_A_Anotation`: mũi tên hướng lên, polyline có global width 50.
-- `ABC_A_Text`: số bậc, cao độ và ghi chú, text height 120.
+- `ABC_A_Anotation`: đường chỉ hướng liên tục, đoạn xuất phát rộng 45 dài 150 và đầu mũi tên dạng chữ V theo bản vẽ tham khảo.
+- `ABC_A_Text`: số bậc lẻ; chiều cao chữ tự điều chỉnh trong khoảng 100-180 theo bề rộng vế thang.
 
-Mặt cắt là cấu tạo triển khai sơ bộ. Kích thước bản thang, lớp bảo vệ và cốt thép phải được kỹ sư kết cấu kiểm tra trước khi dùng cho hồ sơ thi công.
+Mặt cắt là cấu tạo triển khai sơ bộ. Lớp hoàn thiện cổ bậc được đưa lên trên lớp mặt bậc theo thứ tự vẽ; mũi bậc nhô 20 mm so với mặt cổ bậc và có cạnh vát chéo. Kích thước và bản thang phải được kỹ sư kết cấu kiểm tra trước khi dùng cho hồ sơ thi công.
 
 ## Build
 
