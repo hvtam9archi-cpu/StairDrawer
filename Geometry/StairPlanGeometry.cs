@@ -86,7 +86,8 @@ namespace StairDrawer.Geometry
 
         private static void CreateLPlan(DrawingModel drawing, StairPlanParameters parameters)
         {
-            SplitRisers(parameters.TotalRisers, out int firstFlightRisers, out int secondFlightRisers);
+            int firstFlightRisers = parameters.FirstFlightRisers;
+            int secondFlightRisers = parameters.SecondFlightRisers;
             double firstRun = GetFlightRun(firstFlightRisers, parameters.TreadDepth);
             double secondRun = GetFlightRun(secondFlightRisers, parameters.TreadDepth);
             double landingElevation = firstFlightRisers * parameters.RiserHeight;
@@ -139,7 +140,8 @@ namespace StairDrawer.Geometry
 
         private static void CreateUPlan(DrawingModel drawing, StairPlanParameters parameters)
         {
-            SplitRisers(parameters.TotalRisers, out int firstFlightRisers, out int secondFlightRisers);
+            int firstFlightRisers = parameters.FirstFlightRisers;
+            int secondFlightRisers = parameters.SecondFlightRisers;
             double firstRun = GetFlightRun(firstFlightRisers, parameters.TreadDepth);
             double secondRun = GetFlightRun(secondFlightRisers, parameters.TreadDepth);
             double maximumRun = Math.Max(firstRun, secondRun);
@@ -519,12 +521,6 @@ namespace StairDrawer.Geometry
 
             double elevationRange = flightEndElevation - firstTreadElevation;
             return run * ((planCutHeight - firstTreadElevation) / elevationRange);
-        }
-
-        private static void SplitRisers(int totalRisers, out int firstFlightRisers, out int secondFlightRisers)
-        {
-            firstFlightRisers = totalRisers / 2;
-            secondFlightRisers = totalRisers - firstFlightRisers;
         }
 
         private static double GetFlightRun(int risers, double treadDepth)

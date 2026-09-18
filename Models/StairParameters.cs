@@ -15,6 +15,7 @@ namespace StairDrawer.Models
             StairPlanType planType,
             double floorHeight,
             int totalRisers,
+            int firstFlightRisers,
             double treadDepth,
             double stairWidth,
             double landingDepth,
@@ -33,6 +34,11 @@ namespace StairDrawer.Models
             {
                 throw new ArgumentOutOfRangeException(nameof(totalRisers));
             }
+
+            StairParameterValidation.ValidateRiserDistribution(
+                planType,
+                totalRisers,
+                firstFlightRisers);
 
             if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
@@ -66,6 +72,7 @@ namespace StairDrawer.Models
             PlanType = planType;
             FloorHeight = floorHeight;
             TotalRisers = totalRisers;
+            FirstFlightRisers = firstFlightRisers;
             TreadDepth = treadDepth;
             StairWidth = stairWidth;
             LandingDepth = landingDepth;
@@ -78,6 +85,10 @@ namespace StairDrawer.Models
         public double FloorHeight { get; }
 
         public int TotalRisers { get; }
+
+        public int FirstFlightRisers { get; }
+
+        public int SecondFlightRisers => TotalRisers - FirstFlightRisers;
 
         public double TreadDepth { get; }
 
@@ -98,6 +109,7 @@ namespace StairDrawer.Models
             StairPlanType planType,
             double floorHeight,
             int totalRisers,
+            int firstFlightRisers,
             double treadDepth,
             double landingLength,
             double waistSlabThickness,
@@ -115,6 +127,11 @@ namespace StairDrawer.Models
             {
                 throw new ArgumentOutOfRangeException(nameof(totalRisers));
             }
+
+            StairParameterValidation.ValidateRiserDistribution(
+                planType,
+                totalRisers,
+                firstFlightRisers);
 
             if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
@@ -139,6 +156,7 @@ namespace StairDrawer.Models
             PlanType = planType;
             FloorHeight = floorHeight;
             TotalRisers = totalRisers;
+            FirstFlightRisers = firstFlightRisers;
             TreadDepth = treadDepth;
             LandingLength = landingLength;
             WaistSlabThickness = waistSlabThickness;
@@ -150,6 +168,10 @@ namespace StairDrawer.Models
         public double FloorHeight { get; }
 
         public int TotalRisers { get; }
+
+        public int FirstFlightRisers { get; }
+
+        public int SecondFlightRisers => TotalRisers - FirstFlightRisers;
 
         public double TreadDepth { get; }
 
@@ -171,6 +193,32 @@ namespace StairDrawer.Models
                 && planType != StairPlanType.UShape)
             {
                 throw new ArgumentOutOfRangeException(nameof(planType));
+            }
+        }
+
+        public static void ValidateRiserDistribution(
+            StairPlanType planType,
+            int totalRisers,
+            int firstFlightRisers)
+        {
+            int secondFlightRisers = totalRisers - firstFlightRisers;
+            if (planType == StairPlanType.Straight)
+            {
+                if (firstFlightRisers != totalRisers)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(firstFlightRisers),
+                        "A straight stair must contain all risers in its first flight.");
+                }
+
+                return;
+            }
+
+            if (firstFlightRisers < 2 || secondFlightRisers < 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(firstFlightRisers),
+                    "Each flight must contain at least two risers.");
             }
         }
     }

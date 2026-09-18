@@ -67,6 +67,22 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="PreviewDimensionTextBox" TargetType="TextBox" BasedOn="{StaticResource DarkTextBox}">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="3,1" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="PreviewDimensionBorder" TargetType="Border">
+            <Setter Property="Background" Value="#F012141A" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="4,3" />
+        </Style>
+
         <Style x:Key="ChoiceRadioButton" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
@@ -264,13 +280,13 @@
                             </Grid>
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
-                                <TextBlock Text="Tổng số cổ bậc" Style="{StaticResource FieldLabelStyle}" />
+                                <TextBlock x:Name="TotalRisersLabel" Text="Tổng số cổ bậc" Style="{StaticResource FieldLabelStyle}" />
                                 <TextBox x:Name="TotalRisersTextBox" Grid.Column="1" Text="20" Style="{StaticResource DarkTextBox}" ToolTip="2–60; thang L/U tối thiểu 4" TextChanged="OnParameterTextChanged" />
                             </Grid>
                             <Grid Margin="0,0,0,16">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                 <TextBlock Text="Chiều rộng mặt bậc" Style="{StaticResource FieldLabelStyle}" />
-                                <TextBox x:Name="TreadDepthTextBox" Grid.Column="1" Text="270" Style="{StaticResource DarkTextBox}" ToolTip="150–500 mm" />
+                                <TextBox x:Name="TreadDepthTextBox" Grid.Column="1" Text="270" Style="{StaticResource DarkTextBox}" ToolTip="150–500 mm" TextChanged="OnParameterTextChanged" />
                             </Grid>
 
                             <StackPanel x:Name="PlanFieldsPanel">
@@ -278,22 +294,22 @@
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Chiều rộng vế thang" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="StairWidthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="600–5000 mm" />
+                                    <TextBox x:Name="StairWidthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="600–5000 mm" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                                 <Grid x:Name="LandingDepthRow" Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Chiều sâu chiếu nghỉ" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="LandingDepthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="Không nhỏ hơn chiều rộng vế thang" />
+                                    <TextBox x:Name="LandingDepthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="Không nhỏ hơn chiều rộng vế thang" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                                 <Grid x:Name="FlightGapRow" Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Khe giữa hai vế" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="FlightGapTextBox" Grid.Column="1" Text="100" Style="{StaticResource DarkTextBox}" ToolTip="0–1000 mm" />
+                                    <TextBox x:Name="FlightGapTextBox" Grid.Column="1" Text="100" Style="{StaticResource DarkTextBox}" ToolTip="0–1000 mm" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Cao độ mặt phẳng cắt" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="PlanCutHeightTextBox" Grid.Column="1" Text="1200" Style="{StaticResource DarkTextBox}" ToolTip="Lớn hơn 0 và nhỏ hơn chiều cao tầng" />
+                                    <TextBox x:Name="PlanCutHeightTextBox" Grid.Column="1" Text="1200" Style="{StaticResource DarkTextBox}" ToolTip="Lớn hơn 0 và nhỏ hơn chiều cao tầng" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                             </StackPanel>
 
@@ -302,17 +318,17 @@
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Chiều dài chiếu nghỉ" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="LandingLengthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="600–5000 mm" />
+                                    <TextBox x:Name="LandingLengthTextBox" Grid.Column="1" Text="1000" Style="{StaticResource DarkTextBox}" ToolTip="600–5000 mm" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Chiều dày bản BTCT" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="SlabThicknessTextBox" Grid.Column="1" Text="120" Style="{StaticResource DarkTextBox}" ToolTip="80–500 mm" />
+                                    <TextBox x:Name="SlabThicknessTextBox" Grid.Column="1" Text="120" Style="{StaticResource DarkTextBox}" ToolTip="80–500 mm" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                     <TextBlock Text="Chiều dày hoàn thiện" Style="{StaticResource FieldLabelStyle}" />
-                                    <TextBox x:Name="FinishThicknessTextBox" Grid.Column="1" Text="20" Style="{StaticResource DarkTextBox}" ToolTip="1–100 mm" />
+                                    <TextBox x:Name="FinishThicknessTextBox" Grid.Column="1" Text="20" Style="{StaticResource DarkTextBox}" ToolTip="1–100 mm" TextChanged="OnParameterTextChanged" />
                                 </Grid>
                             </StackPanel>
                         </StackPanel>
@@ -340,7 +356,60 @@
                         </Grid>
                         <Border Grid.Row="1" Background="#1A1C21" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
                             <Viewbox Stretch="Uniform">
-                                <Canvas x:Name="PreviewCanvas" Width="460" Height="280" ClipToBounds="True" />
+                                <Canvas x:Name="PreviewCanvas" Width="460" Height="280" ClipToBounds="True">
+                                    <Canvas x:Name="PreviewGeometryCanvas" Width="460" Height="280" IsHitTestVisible="False" />
+
+                                    <Border x:Name="FirstFlightRisersDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Vế 1" Margin="0,0,5,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox x:Name="FirstFlightRisersTextBox" Text="10" ToolTip="Số cổ bậc vế trước chiếu nghỉ" Style="{StaticResource PreviewDimensionTextBox}" TextChanged="OnFlightRisersTextChanged" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="SecondFlightRisersDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Vế 2" Margin="0,0,5,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox x:Name="SecondFlightRisersTextBox" Text="10" ToolTip="Số cổ bậc vế sau chiếu nghỉ" Style="{StaticResource PreviewDimensionTextBox}" TextChanged="OnFlightRisersTextChanged" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="TreadDepthDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="b" Margin="0,0,4,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox Text="{Binding Text, ElementName=TreadDepthTextBox, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Chiều rộng một mặt bậc (mm)"
+                                                     Style="{StaticResource PreviewDimensionTextBox}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="StairWidthDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Rộng" Margin="0,0,4,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox Text="{Binding Text, ElementName=StairWidthTextBox, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Chiều rộng vế thang (mm)"
+                                                     Style="{StaticResource PreviewDimensionTextBox}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="LandingDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="CN" Margin="0,0,4,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox x:Name="LandingPreviewTextBox"
+                                                     ToolTip="Kích thước chiếu nghỉ (mm)"
+                                                     Style="{StaticResource PreviewDimensionTextBox}"
+                                                     TextChanged="OnLandingPreviewTextChanged" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border x:Name="FlightGapDimensionBorder" Style="{StaticResource PreviewDimensionBorder}" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Khe" Margin="0,0,4,0" FontSize="10" Foreground="{StaticResource MutedTextBrush}" />
+                                            <TextBox Text="{Binding Text, ElementName=FlightGapTextBox, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Khe giữa hai vế thang (mm)"
+                                                     Style="{StaticResource PreviewDimensionTextBox}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Canvas>
                             </Viewbox>
                         </Border>
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">

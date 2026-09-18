@@ -21,8 +21,7 @@ namespace StairDrawer.Services
             new LayerDefinition(StairLayers.PlanText, 7, LineWeight.LineWeight018, "Continuous"),
             new LayerDefinition(StairLayers.Concrete, 1, LineWeight.LineWeight035, "Continuous"),
             new LayerDefinition(StairLayers.Brick, 30, LineWeight.LineWeight018, "Continuous"),
-            new LayerDefinition(StairLayers.Finish, 2, LineWeight.LineWeight030, "Continuous"),
-            new LayerDefinition(StairLayers.Annotation, 7, LineWeight.LineWeight018, "Continuous")
+            new LayerDefinition(StairLayers.Finish, 2, LineWeight.LineWeight030, "Continuous")
         };
 
         public int Draw(Database database, DrawingModel drawing, StairPlacement placement)
