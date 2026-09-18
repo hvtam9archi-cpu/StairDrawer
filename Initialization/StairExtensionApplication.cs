@@ -61,7 +61,7 @@ namespace StairDrawer.Initialization
 
                 UnsubscribeFromIdle();
                 document.Editor.WriteMessage(
-                    "\nStairDrawer loaded. Commands: STAIRPLAN, STAIRSECTION, STAIRDRAW.\n");
+                    "\nStairDrawer loaded. Command: STAIRDRAW.\n");
             }
             catch (AutoCADException exception)
             {

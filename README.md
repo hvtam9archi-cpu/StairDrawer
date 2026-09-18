@@ -5,8 +5,6 @@ Plugin C# cho AutoCAD 2021, target `.NET Framework 4.8` và `x64`.
 ## Chức năng
 
 - `STAIRDRAW`: mở giao diện WPF để chọn mặt bằng/mặt cắt, loại thang, xem preview và nhập toàn bộ thông số.
-- `STAIRPLAN`: mở cùng giao diện với loại bản vẽ được khóa ở mặt bằng; hỗ trợ thang thẳng, chữ L hoặc chữ U.
-- `STAIRSECTION`: mở cùng giao diện với loại bản vẽ được khóa ở mặt cắt; hỗ trợ mặt cắt thẳng hoặc mặt cắt triển khai cho thang chữ L/U.
 - Tất cả kích thước nhập theo đơn vị bản vẽ hiện hành; bộ giá trị mặc định được thiết kế cho bản vẽ dùng milimét.
 - Hình học được đặt trên mặt phẳng WCS XY tại cao độ Z của điểm chèn.
 
@@ -30,7 +28,9 @@ Các Autodesk managed DLL không được copy vào output. Truyền thư mục 
 dotnet build .\StairDrawer.sln -c Release -p:Platform=x64 -p:AutoCADManagedDir="C:\Program Files\Autodesk\AutoCAD 2021"
 ```
 
-Hoặc đặt biến môi trường `ACAD_MANAGED_DIR`, sau đó build bình thường. Bundle được tạo tại `bin\x64\Release\net48\StairDrawer.bundle` và không tự động deploy vào `ApplicationPlugins`.
+Hoặc đặt biến môi trường `ACAD_MANAGED_DIR`, sau đó build bình thường. Mỗi lần build, bundle được tạo trong thư mục output và tự động deploy vào `%AppData%\Autodesk\ApplicationPlugins\StairDrawer.bundle`.
+
+Có thể tắt deploy cho một lần build bằng `-p:DeployAutoCADBundle=false`, hoặc đổi thư mục đích bằng `-p:ApplicationPluginsDir="..."`.
 
 ### Debug trực tiếp bằng Visual Studio
 
@@ -51,5 +51,5 @@ Chọn cấu hình `Debug | x64` và nhấn `F5`. File `start.scr` tương ứng
 
 ## Nạp plugin
 
-- Dùng `NETLOAD` và chọn `StairDrawer.dll`; hoặc
-- Copy cả thư mục `StairDrawer.bundle` vào `%AppData%\Autodesk\ApplicationPlugins`, sau đó khởi động lại AutoCAD.
+- Sau khi build, khởi động lại AutoCAD để nạp bundle đã được deploy tự động; hoặc
+- Dùng `NETLOAD` và chọn `StairDrawer.dll` trong thư mục output khi cần kiểm tra thủ công.

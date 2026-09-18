@@ -21,7 +21,9 @@ namespace StairDrawer.Services
             new LayerDefinition(StairLayers.PlanText, 7, LineWeight.LineWeight018, "Continuous"),
             new LayerDefinition(StairLayers.Concrete, 1, LineWeight.LineWeight035, "Continuous"),
             new LayerDefinition(StairLayers.Brick, 30, LineWeight.LineWeight018, "Continuous"),
-            new LayerDefinition(StairLayers.Finish, 2, LineWeight.LineWeight030, "Continuous")
+            new LayerDefinition(StairLayers.Finish, 2, LineWeight.LineWeight030, "Continuous"),
+            new LayerDefinition(StairLayers.Railing, 3, LineWeight.LineWeight025, "Continuous"),
+            new LayerDefinition(StairLayers.RailingGlass, 4, LineWeight.LineWeight018, "Continuous")
         };
 
         public int Draw(Database database, DrawingModel drawing, StairPlacement placement)
@@ -62,6 +64,7 @@ namespace StairDrawer.Services
                 entityCount += AppendPolylines(
                     drawing.Polylines,
                     false,
+                    false,
                     transform,
                     placement.Origin.Z,
                     currentSpace,
@@ -97,6 +100,23 @@ namespace StairDrawer.Services
 
                 entityCount += AppendPolylines(
                     drawing.Polylines,
+                    true,
+                    false,
+                    transform,
+                    placement.Origin.Z,
+                    currentSpace,
+                    transaction);
+
+                entityCount += AppendWipeouts(
+                    drawing.Wipeouts,
+                    transform,
+                    placement.Origin.Z,
+                    currentSpace,
+                    transaction);
+
+                entityCount += AppendPolylines(
+                    drawing.Polylines,
+                    true,
                     true,
                     transform,
                     placement.Origin.Z,
@@ -142,6 +162,7 @@ namespace StairDrawer.Services
         private static int AppendPolylines(
             IEnumerable<PolylinePrimitive> primitives,
             bool drawOnTop,
+            bool occludesBackground,
             DrawingTransform transform,
             double elevation,
             BlockTableRecord currentSpace,
@@ -150,7 +171,8 @@ namespace StairDrawer.Services
             int appendedCount = 0;
             foreach (PolylinePrimitive primitive in primitives)
             {
-                if (primitive.DrawOnTop != drawOnTop)
+                if (primitive.DrawOnTop != drawOnTop
+                    || (drawOnTop && primitive.OccludesBackground != occludesBackground))
                 {
                     continue;
                 }
@@ -158,6 +180,57 @@ namespace StairDrawer.Services
                 Polyline polyline = CreatePolyline(primitive, transform, elevation);
                 AppendEntity(currentSpace, transaction, polyline);
                 appendedCount++;
+            }
+
+            return appendedCount;
+        }
+
+        private static int AppendWipeouts(
+            IEnumerable<WipeoutPrimitive> primitives,
+            DrawingTransform transform,
+            double elevation,
+            BlockTableRecord currentSpace,
+            Transaction transaction)
+        {
+            int appendedCount = 0;
+            foreach (WipeoutPrimitive primitive in primitives)
+            {
+                var boundary = new Point2dCollection();
+                foreach (Point2 vertex in primitive.Boundary)
+                {
+                    Point3d worldPoint = transform.ToWorld(vertex);
+                    boundary.Add(new Point2d(worldPoint.X, worldPoint.Y));
+                }
+
+                Point3d firstPoint = transform.ToWorld(primitive.Boundary[0]);
+                boundary.Add(new Point2d(firstPoint.X, firstPoint.Y));
+
+                var wipeout = new Wipeout
+                {
+                    Layer = primitive.LayerName
+                };
+                bool appended = false;
+                try
+                {
+                    wipeout.SetFrom(boundary, Vector3d.ZAxis);
+                    if (Math.Abs(elevation) > 1e-9)
+                    {
+                        wipeout.TransformBy(Matrix3d.Displacement(
+                            Vector3d.ZAxis * elevation));
+                    }
+
+                    currentSpace.AppendEntity(wipeout);
+                    transaction.AddNewlyCreatedDBObject(wipeout, true);
+                    appended = true;
+                    appendedCount++;
+                }
+                finally
+                {
+                    if (!appended)
+                    {
+                        wipeout.Dispose();
+                    }
+                }
             }
 
             return appendedCount;

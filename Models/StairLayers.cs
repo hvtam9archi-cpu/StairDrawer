@@ -11,5 +11,7 @@ namespace StairDrawer.Models
         public const string Concrete = "STAIR-CONCRETE";
         public const string Brick = "STAIR-BRICK";
         public const string Finish = "STAIR-FINISH";
+        public const string Railing = "STAIR-RAILING";
+        public const string RailingGlass = "STAIR-RAILING-GLASS";
     }
 }

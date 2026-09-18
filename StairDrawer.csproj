@@ -14,6 +14,9 @@
     <AutoCADExecutable Condition="'$(AutoCADExecutable)' == '' and Exists('$(AutoCADManagedDir)\acad.exe')">$(AutoCADManagedDir)\acad.exe</AutoCADExecutable>
     <AutoCADDebugScriptPath>$(MSBuildProjectDirectory)\bin\$(Platform)\$(Configuration)\$(TargetFramework)\start.scr</AutoCADDebugScriptPath>
     <CreateAutoCADBundle Condition="'$(CreateAutoCADBundle)' == ''">true</CreateAutoCADBundle>
+    <DeployAutoCADBundle Condition="'$(DeployAutoCADBundle)' == ''">true</DeployAutoCADBundle>
+    <ApplicationPluginsDir Condition="'$(ApplicationPluginsDir)' == ''">$(APPDATA)\Autodesk\ApplicationPlugins</ApplicationPluginsDir>
+    <DeployedBundleDir Condition="'$(DeployedBundleDir)' == '' and '$(ApplicationPluginsDir)' != ''">$(ApplicationPluginsDir)\StairDrawer.bundle</DeployedBundleDir>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug' and Exists('$(AutoCADExecutable)')">
@@ -52,6 +55,25 @@
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb"
           DestinationFolder="$(BundleOutputDir)\Contents\Windows"
           Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+  </Target>
+
+  <Target Name="DeployBundle"
+          AfterTargets="CreateBundle"
+          Condition="'$(CreateAutoCADBundle)' == 'true' and '$(DeployAutoCADBundle)' == 'true'">
+    <Error Condition="'$(ApplicationPluginsDir)' == ''"
+           Text="Khong xac dinh duoc thu muc ApplicationPlugins. Dat APPDATA hoac truyen /p:ApplicationPluginsDir=&quot;...&quot;." />
+    <MakeDir Directories="$(DeployedBundleDir)\Contents\Windows" />
+    <Copy SourceFiles="$(BundleOutputDir)\PackageContents.xml"
+          DestinationFiles="$(DeployedBundleDir)\PackageContents.xml"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(BundleOutputDir)\Contents\Windows\$(TargetName).dll"
+          DestinationFiles="$(DeployedBundleDir)\Contents\Windows\$(TargetName).dll"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(BundleOutputDir)\Contents\Windows\$(TargetName).pdb"
+          DestinationFiles="$(DeployedBundleDir)\Contents\Windows\$(TargetName).pdb"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(BundleOutputDir)\Contents\Windows\$(TargetName).pdb')" />
+    <Message Importance="high" Text="Deployed $(TargetName).bundle to $(DeployedBundleDir)" />
   </Target>
 
   <Target Name="GenerateAutoCADDebugScript" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">

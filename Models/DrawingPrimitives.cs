@@ -51,7 +51,8 @@ namespace StairDrawer.Models
             string layerName,
             double globalWidth = 0.0,
             double linetypeScale = 1.0,
-            bool drawOnTop = false)
+            bool drawOnTop = false,
+            bool occludesBackground = false)
         {
             if (vertices == null)
             {
@@ -104,6 +105,7 @@ namespace StairDrawer.Models
             GlobalWidth = globalWidth;
             LinetypeScale = linetypeScale;
             DrawOnTop = drawOnTop;
+            OccludesBackground = occludesBackground;
         }
 
         public IReadOnlyList<Point2> Vertices { get; }
@@ -117,6 +119,55 @@ namespace StairDrawer.Models
         public double LinetypeScale { get; }
 
         public bool DrawOnTop { get; }
+
+        public bool OccludesBackground { get; }
+    }
+
+    internal sealed class WipeoutPrimitive
+    {
+        public WipeoutPrimitive(IEnumerable<Point2> boundary, string layerName)
+        {
+            if (boundary == null)
+            {
+                throw new ArgumentNullException(nameof(boundary));
+            }
+
+            Boundary = new List<Point2>(boundary);
+            if (Boundary.Count < 3)
+            {
+                throw new ArgumentException(
+                    "A wipeout boundary requires at least three vertices.",
+                    nameof(boundary));
+            }
+
+            for (int vertexIndex = 1; vertexIndex < Boundary.Count; vertexIndex++)
+            {
+                if ((Boundary[vertexIndex] - Boundary[vertexIndex - 1]).Length <= 1e-9)
+                {
+                    throw new ArgumentException(
+                        "Consecutive wipeout boundary vertices must be distinct.",
+                        nameof(boundary));
+                }
+            }
+
+            if ((Boundary[0] - Boundary[Boundary.Count - 1]).Length <= 1e-9)
+            {
+                throw new ArgumentException(
+                    "Do not repeat the first vertex in a wipeout boundary.",
+                    nameof(boundary));
+            }
+
+            if (string.IsNullOrWhiteSpace(layerName))
+            {
+                throw new ArgumentException("A layer name is required.", nameof(layerName));
+            }
+
+            LayerName = layerName;
+        }
+
+        public IReadOnlyList<Point2> Boundary { get; }
+
+        public string LayerName { get; }
     }
 
     internal sealed class CirclePrimitive
@@ -201,6 +252,8 @@ namespace StairDrawer.Models
         public IList<LinePrimitive> Lines { get; } = new List<LinePrimitive>();
 
         public IList<PolylinePrimitive> Polylines { get; } = new List<PolylinePrimitive>();
+
+        public IList<WipeoutPrimitive> Wipeouts { get; } = new List<WipeoutPrimitive>();
 
         public IList<CirclePrimitive> Circles { get; } = new List<CirclePrimitive>();
 

@@ -15,8 +15,6 @@ namespace StairDrawer.Commands
     internal static class CommandNames
     {
         public const string Draw = "STAIRDRAW";
-        public const string DrawPlan = "STAIRPLAN";
-        public const string DrawSection = "STAIRSECTION";
     }
 
     public sealed class StairCommands
@@ -30,24 +28,6 @@ namespace StairDrawer.Commands
                 document,
                 StairDrawingMode.Plan,
                 true));
-        }
-
-        [CommandMethod(CommandNames.DrawPlan, CommandFlags.Modal)]
-        public void DrawPlan()
-        {
-            ExecuteSafely(CommandNames.DrawPlan, document => ShowConfigurationWindow(
-                document,
-                StairDrawingMode.Plan,
-                false));
-        }
-
-        [CommandMethod(CommandNames.DrawSection, CommandFlags.Modal)]
-        public void DrawSection()
-        {
-            ExecuteSafely(CommandNames.DrawSection, document => ShowConfigurationWindow(
-                document,
-                StairDrawingMode.Section,
-                false));
         }
 
         private void ShowConfigurationWindow(

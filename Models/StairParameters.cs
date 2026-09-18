@@ -9,6 +9,12 @@ namespace StairDrawer.Models
         UShape
     }
 
+    internal enum StairRailingType
+    {
+        Iron,
+        Glass
+    }
+
     internal sealed class StairPlanParameters
     {
         public StairPlanParameters(
@@ -113,7 +119,10 @@ namespace StairDrawer.Models
             double treadDepth,
             double landingLength,
             double waistSlabThickness,
-            double finishThickness)
+            double finishThickness,
+            bool drawRailing,
+            StairRailingType railingType,
+            double railingHeight)
         {
             StairParameterValidation.ValidatePlanType(planType);
 
@@ -153,6 +162,19 @@ namespace StairDrawer.Models
                 throw new ArgumentOutOfRangeException(nameof(finishThickness));
             }
 
+            if (railingType != StairRailingType.Iron && railingType != StairRailingType.Glass)
+            {
+                throw new ArgumentOutOfRangeException(nameof(railingType));
+            }
+
+            if (drawRailing
+                && (!NumericValidation.IsFinite(railingHeight)
+                    || railingHeight < 600.0
+                    || railingHeight > 1500.0))
+            {
+                throw new ArgumentOutOfRangeException(nameof(railingHeight));
+            }
+
             PlanType = planType;
             FloorHeight = floorHeight;
             TotalRisers = totalRisers;
@@ -161,6 +183,9 @@ namespace StairDrawer.Models
             LandingLength = landingLength;
             WaistSlabThickness = waistSlabThickness;
             FinishThickness = finishThickness;
+            DrawRailing = drawRailing;
+            RailingType = railingType;
+            RailingHeight = railingHeight;
         }
 
         public StairPlanType PlanType { get; }
@@ -180,6 +205,12 @@ namespace StairDrawer.Models
         public double WaistSlabThickness { get; }
 
         public double FinishThickness { get; }
+
+        public bool DrawRailing { get; }
+
+        public StairRailingType RailingType { get; }
+
+        public double RailingHeight { get; }
 
         public double RiserHeight => FloorHeight / TotalRisers;
     }
