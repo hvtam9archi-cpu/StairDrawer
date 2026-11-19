@@ -10,6 +10,7 @@ namespace StairDrawer.Initialization
     public sealed class StairExtensionApplication : IExtensionApplication
     {
         private bool _idleSubscribed;
+        private readonly StairRibbonSetup _ribbon = new StairRibbonSetup();
 
         public void Initialize()
         {
@@ -20,6 +21,7 @@ namespace StairDrawer.Initialization
                     return;
                 }
 
+                _ribbon.Initialize();
                 AutoCADApplication.Idle += OnIdle;
                 _idleSubscribed = true;
             }
@@ -38,6 +40,7 @@ namespace StairDrawer.Initialization
             try
             {
                 UnsubscribeFromIdle();
+                _ribbon.Terminate();
             }
             catch (AutoCADException exception)
             {
@@ -61,7 +64,7 @@ namespace StairDrawer.Initialization
 
                 UnsubscribeFromIdle();
                 document.Editor.WriteMessage(
-                    "\nStairDrawer loaded. Command: STAIRDRAW.\n");
+                    "\nStairDrawer loaded. Commands: STAIRDRAW, STAIRDETAIL.\n");
             }
             catch (AutoCADException exception)
             {

@@ -1,7 +1,9 @@
 using System;
-using System.Diagnostics;
+using Trace = System.Diagnostics.Trace;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using StairDrawer.Geometry;
 using StairDrawer.Interaction;
@@ -15,11 +17,13 @@ namespace StairDrawer.Commands
     internal static class CommandNames
     {
         public const string Draw = "STAIRDRAW";
+        public const string Detail = "STAIRDETAIL";
     }
 
     public sealed class StairCommands
     {
         private readonly StairDrawingService _drawingService = new StairDrawingService();
+        private StairDrawingConfiguration _previousConfiguration;
 
         [CommandMethod(CommandNames.Draw, CommandFlags.Modal)]
         public void DrawStair()
@@ -30,12 +34,55 @@ namespace StairDrawer.Commands
                 true));
         }
 
+        [CommandMethod(CommandNames.Detail, CommandFlags.Modal)]
+        public void ExtractStairDetail()
+        {
+            ExecuteSafely(CommandNames.Detail, document =>
+            {
+                var prompt = new PromptSelectionOptions
+                {
+                    MessageForAdding = "\nChọn block hoặc chọn toàn bộ các nét thuộc mặt cắt thang cần trích: ",
+                    AllowDuplicates = false
+                };
+                PromptSelectionResult selection = document.Editor.GetSelection(prompt);
+                if (selection.Status != PromptStatus.OK) return;
+                ObjectId[] selected = selection.Value.GetObjectIds();
+                bool isBlock;
+                using (Transaction tx = document.Database.TransactionManager.StartOpenCloseTransaction())
+                    isBlock = selected.Length == 1 && tx.GetObject(selected[0], OpenMode.ForRead) is BlockReference;
+                ObjectId sourceId = isBlock ? selected[0]
+                    : StairDetailService.CreateTemporarySource(document.Database, new ObjectIdCollection(selected));
+                try { ExtractDetail(document, sourceId); }
+                finally { if (!isBlock) StairDetailService.RemoveTemporarySource(document.Database, sourceId); }
+            });
+        }
+
+        private static void ExtractDetail(Document document, ObjectId sourceId)
+        {
+            var dialog = new StairDetailWindow(StairDetailService.StoneThickness(document.Database, sourceId),
+                document.Database.Dimscale >= 5 ? document.Database.Dimscale : 50,
+                StairDetailService.NextNumber(document.Database));
+            if (Application.ShowModalWindow(dialog) != true) return;
+            double elevation;
+            using (Transaction tx = document.Database.TransactionManager.StartOpenCloseTransaction())
+                elevation = ((BlockReference)tx.GetObject(sourceId, OpenMode.ForRead)).GeometricExtents.MinPoint.Z;
+            var center = new StairDetailCircleJig(dialog.Options.Radius, elevation);
+            if (document.Editor.Drag(center).Status != PromptStatus.OK) return;
+            var destination = new StairDetailCircleJig(dialog.Options.Radius * dialog.Options.Magnification,
+                null, center.Position, dialog.Options.Radius);
+            if (document.Editor.Drag(destination).Status != PromptStatus.OK) return;
+            StairDetailResult result = new StairDetailService().Create(document.Database, sourceId, dialog.Options,
+                center.Position, destination.Position);
+            document.Editor.WriteMessage("\nĐã trích chi tiết {0}: {1} dim, {2} ghi chú vật liệu{3}.",
+                dialog.Options.Number, result.DimensionCount, result.NoteCount, result.UsedCallout ? ", đường nối bằng Callout" : "");
+        }
+
         private void ShowConfigurationWindow(
             Document document,
             StairDrawingMode initialDrawingMode,
             bool allowDrawingModeSelection)
         {
-            var window = new StairConfigurationWindow(initialDrawingMode, allowDrawingModeSelection);
+            var window = new StairConfigurationWindow(initialDrawingMode, allowDrawingModeSelection, _previousConfiguration);
             bool? dialogResult = Application.ShowModalWindow(window);
             StairDrawingConfiguration configuration = window.Configuration;
             if (dialogResult != true
@@ -61,7 +108,17 @@ namespace StairDrawer.Commands
                 riserHeight = configuration.SectionParameters.RiserHeight;
             }
 
+            if (window.ExtractDetail && configuration.DrawingMode == StairDrawingMode.Section)
+            {
+                ObjectId sourceId = _drawingService.DrawAsBlock(document.Database, drawing, placement, configuration.SectionParameters);
+                _previousConfiguration = configuration;
+                document.Editor.WriteMessage("\nĐã vẽ mặt cắt dạng block; chọn vùng cần phóng chi tiết.");
+                ExtractDetail(document, sourceId);
+                return;
+            }
+
             int count = _drawingService.Draw(document.Database, drawing, placement);
+            _previousConfiguration = configuration;
             document.Editor.WriteMessage(
                 "\nDa ve {0} cau thang ({1} doi tuong).",
                 drawingLabel,

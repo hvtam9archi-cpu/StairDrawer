@@ -31,6 +31,7 @@ namespace StairDrawer.UI
         private static readonly Brush PreviewSecondaryBrush = CreateBrush(232, 234, 237);
         private static readonly Brush PreviewHiddenBrush = CreateBrush(107, 114, 128);
         private static readonly Brush PreviewCutBrush = CreateBrush(239, 68, 68);
+        private static readonly Brush PreviewSectionTraceBrush = CreateBrush(94, 234, 212);
         private static readonly Brush PreviewConcreteBrush = CreateBrush(96, 165, 250);
         private static readonly Brush PreviewConcreteFillBrush = CreateBrush(30, 58, 90);
         private static readonly Brush PreviewWipeoutBrush = CreateBrush(26, 28, 33);
@@ -44,21 +45,29 @@ namespace StairDrawer.UI
 
         private readonly StairDrawingMode _initialDrawingMode;
         private readonly bool _allowDrawingModeSelection;
+        private readonly StairDrawingConfiguration _previousConfiguration;
         private TextBox _invalidTextBox;
         private bool _isRuntimeInitialized;
         private bool _isSynchronizingFields;
         private StairPlanType? _lastStairType;
+        private double? _sectionCutPosition;
+        private bool _draggingSectionCut;
+        private StairSectionCut _planPreviewCut;
+        private PreviewTransform _planPreviewTransform;
 
         internal StairConfigurationWindow(
             StairDrawingMode initialDrawingMode,
-            bool allowDrawingModeSelection)
+            bool allowDrawingModeSelection,
+            StairDrawingConfiguration previousConfiguration = null)
         {
             _initialDrawingMode = initialDrawingMode;
             _allowDrawingModeSelection = allowDrawingModeSelection;
+            _previousConfiguration = previousConfiguration;
             InitializeComponent();
         }
 
         internal StairDrawingConfiguration Configuration { get; private set; }
+        internal bool ExtractDetail { get; private set; }
 
         private StairDrawingMode SelectedDrawingMode => SectionRadioButton.IsChecked == true
             ? StairDrawingMode.Section
@@ -83,9 +92,17 @@ namespace StairDrawer.UI
             ? StairRailingType.Glass
             : StairRailingType.Iron;
 
+        private bool HasStraightLanding => SelectedStairType == StairPlanType.Straight
+            && StraightLandingCheckBox.IsChecked == true;
+
+        private bool HasSecondFlight => SelectedStairType != StairPlanType.Straight || HasStraightLanding;
+
+        private StairCutSelection SelectedSectionCut => new StairCutSelection(
+            _sectionCutPosition, ReverseSectionViewCheckBox.IsChecked == true);
+
         private void OnWindowLoaded(object sender, RoutedEventArgs eventArgs)
         {
-            if (System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
+            if (_isRuntimeInitialized || System.ComponentModel.DesignerProperties.GetIsInDesignMode(this))
             {
                 return;
             }
@@ -97,10 +114,60 @@ namespace StairDrawer.UI
                     PlanRadioButton.IsChecked = _initialDrawingMode == StairDrawingMode.Plan;
                     SectionRadioButton.IsChecked = _initialDrawingMode == StairDrawingMode.Section;
                     DrawingTypePanel.IsEnabled = _allowDrawingModeSelection;
+                    if (_previousConfiguration == null)
+                    {
+                        InitializeRiserDistribution();
+                    }
+                    else
+                    {
+                        RestoreStairDimensions(_previousConfiguration);
+                    }
+
                     _isRuntimeInitialized = true;
-                    InitializeRiserDistribution();
                     UpdateInterface();
                 });
+        }
+
+        private void RestoreStairDimensions(StairDrawingConfiguration configuration)
+        {
+            StairPlanParameters plan = configuration.PlanParameters;
+            StairSectionParameters section = configuration.SectionParameters;
+            StairPlanType shape = plan?.PlanType ?? section.PlanType;
+            StraightRadioButton.IsChecked = shape == StairPlanType.Straight;
+            LShapeRadioButton.IsChecked = shape == StairPlanType.LShape;
+            UShapeRadioButton.IsChecked = shape == StairPlanType.UShape;
+            StraightLandingCheckBox.IsChecked = plan?.HasStraightLanding ?? section.HasStraightLanding;
+            FloorHeightTextBox.Text = (plan?.FloorHeight ?? section.FloorHeight).ToString(CultureInfo.CurrentCulture);
+            TreadDepthTextBox.Text = (plan?.TreadDepth ?? section.TreadDepth).ToString(CultureInfo.CurrentCulture);
+            FirstFlightRisersTextBox.Text = (plan?.FirstFlightRisers ?? section.FirstFlightRisers).ToString(CultureInfo.CurrentCulture);
+            SecondFlightRisersTextBox.Text = (plan?.SecondFlightRisers ?? section.SecondFlightRisers).ToString(CultureInfo.CurrentCulture);
+            StairWidthTextBox.Text = (plan?.StairWidth ?? section.PlanStairWidth).ToString(CultureInfo.CurrentCulture);
+            LandingDepthTextBox.Text = (plan?.LandingDepth ?? section.PlanLandingDepth).ToString(CultureInfo.CurrentCulture);
+            FlightGapTextBox.Text = (plan?.FlightGap ?? section.PlanFlightGap).ToString(CultureInfo.CurrentCulture);
+            UTurnSteps steps = plan?.TurnSteps ?? section.TurnSteps;
+            MiddleFlightTreadsTextBox.Text = Math.Max(0, steps.MiddleFlightRisers - 1).ToString(CultureInfo.CurrentCulture);
+            FirstWinderRisersTextBox.Text = steps.FirstWinderRisers.ToString(CultureInfo.CurrentCulture);
+            SecondWinderRisersTextBox.Text = steps.SecondWinderRisers.ToString(CultureInfo.CurrentCulture);
+            if (plan != null)
+            {
+                PlanCutHeightTextBox.Text = plan.PlanCutHeight.ToString(CultureInfo.CurrentCulture);
+                DrawPlanRailingCheckBox.IsChecked = plan.DrawRailing;
+            }
+            else
+            {
+                LandingLengthTextBox.Text = section.LandingLength.ToString(CultureInfo.CurrentCulture);
+                SlabThicknessTextBox.Text = section.WaistSlabThickness.ToString(CultureInfo.CurrentCulture);
+                FinishThicknessTextBox.Text = section.FinishThickness.ToString(CultureInfo.CurrentCulture);
+                DrawRailingCheckBox.IsChecked = section.DrawRailing;
+                RailingHeightTextBox.Text = section.RailingHeight.ToString(CultureInfo.CurrentCulture);
+                IronRailingRadioButton.IsChecked = section.RailingType == StairRailingType.Iron;
+                GlassRailingRadioButton.IsChecked = section.RailingType == StairRailingType.Glass;
+            }
+
+            StairCutSelection cut = plan?.SectionCut ?? section.SectionCut;
+            _sectionCutPosition = cut.Position;
+            ReverseSectionViewCheckBox.IsChecked = cut.ReverseView;
+            _lastStairType = shape;
         }
 
         private void OnOptionChanged(object sender, RoutedEventArgs eventArgs)
@@ -119,7 +186,8 @@ namespace StairDrawer.UI
                 {
                     if (sender == StraightRadioButton
                         || sender == LShapeRadioButton
-                        || sender == UShapeRadioButton)
+                        || sender == UShapeRadioButton
+                        || sender == StraightLandingCheckBox)
                     {
                         InitializeRiserDistribution();
                     }
@@ -143,41 +211,6 @@ namespace StairDrawer.UI
                 "update stair preview",
                 () =>
                 {
-                    if (sender == LandingDepthTextBox || sender == LandingLengthTextBox)
-                    {
-                        SynchronizeLandingPreviewFromForm();
-                    }
-
-                    DrawPreview(SelectedDrawingMode, SelectedStairType);
-                    UpdateRiserHeightHint();
-                });
-        }
-
-        private void OnLandingPreviewTextChanged(object sender, TextChangedEventArgs eventArgs)
-        {
-            if (!_isRuntimeInitialized
-                || _isSynchronizingFields
-                || LandingPreviewTextBox == null)
-            {
-                return;
-            }
-
-            ExecuteUiAction(
-                "update landing from stair preview",
-                () =>
-                {
-                    TextBox landingTextBox = SelectedDrawingMode == StairDrawingMode.Plan
-                        ? LandingDepthTextBox
-                        : LandingLengthTextBox;
-                    _isSynchronizingFields = true;
-                    try
-                    {
-                        landingTextBox.Text = LandingPreviewTextBox.Text;
-                    }
-                    finally
-                    {
-                        _isSynchronizingFields = false;
-                    }
 
                     DrawPreview(SelectedDrawingMode, SelectedStairType);
                     UpdateRiserHeightHint();
@@ -201,7 +234,95 @@ namespace StairDrawer.UI
                 });
         }
 
+        private void OnTurnStepsChanged(object sender, TextChangedEventArgs eventArgs)
+        {
+            if (_isRuntimeInitialized && !_isSynchronizingFields)
+            {
+                ExecuteUiAction("update U-turn steps", UpdateInterface);
+            }
+        }
+
+        private void OnPreviewSizeChanged(object sender, SizeChangedEventArgs eventArgs)
+        {
+            if (_isRuntimeInitialized)
+            {
+                ExecuteUiAction("resize stair preview", () => DrawPreview(SelectedDrawingMode, SelectedStairType));
+            }
+        }
+
+        private bool IsOnSectionCut(Point point)
+        {
+            if (SelectedDrawingMode != StairDrawingMode.Plan || _planPreviewTransform == null || _planPreviewCut == null)
+            {
+                return false;
+            }
+
+            Point start = _planPreviewTransform.ToScreen(new Point2(_planPreviewCut.StartX, _planPreviewCut.Y));
+            Point end = _planPreviewTransform.ToScreen(new Point2(_planPreviewCut.EndX, _planPreviewCut.Y));
+            return Math.Abs(point.Y - start.Y) <= 12.0 && point.X >= start.X - 18.0 && point.X <= end.X + 18.0;
+        }
+
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs eventArgs)
+        {
+            if (!IsOnSectionCut(eventArgs.GetPosition(PreviewCanvas)) || !PreviewCanvas.CaptureMouse())
+            {
+                return;
+            }
+
+            _draggingSectionCut = true;
+            PreviewCanvas.Cursor = Cursors.SizeNS;
+            eventArgs.Handled = true;
+        }
+
+        private void OnPreviewMouseMove(object sender, MouseEventArgs eventArgs)
+        {
+            Point point = eventArgs.GetPosition(PreviewCanvas);
+            if (_draggingSectionCut)
+            {
+                MoveSectionCut(point.Y);
+                return;
+            }
+
+            PreviewCanvas.Cursor = IsOnSectionCut(point) ? Cursors.SizeNS : null;
+        }
+
+        private void MoveSectionCut(double screenY)
+        {
+            double position = _planPreviewTransform.ToWorldY(screenY) / _planPreviewCut.TotalWidth;
+            _sectionCutPosition = Math.Max(0.0, Math.Min(1.0, position));
+            ExecuteUiAction("drag section cut", () => DrawPreview(SelectedDrawingMode, SelectedStairType));
+        }
+
+        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs eventArgs)
+        {
+            if (_draggingSectionCut)
+            {
+                PreviewCanvas.ReleaseMouseCapture();
+                eventArgs.Handled = true;
+            }
+        }
+
+        private void OnPreviewLostMouseCapture(object sender, MouseEventArgs eventArgs)
+        {
+            if (_draggingSectionCut)
+            {
+                _draggingSectionCut = false;
+                PreviewCanvas.Cursor = null;
+                ExecuteUiAction("finish section cut drag", () => DrawPreview(SelectedDrawingMode, SelectedStairType));
+            }
+        }
+
         private void OnDrawClicked(object sender, RoutedEventArgs eventArgs)
+        {
+            AcceptConfiguration(false);
+        }
+
+        private void OnDrawDetailClicked(object sender, RoutedEventArgs eventArgs)
+        {
+            AcceptConfiguration(true);
+        }
+
+        private void AcceptConfiguration(bool extractDetail)
         {
             ExecuteUiAction(
                 "accept stair configuration",
@@ -213,6 +334,7 @@ namespace StairDrawer.UI
                     }
 
                     Configuration = configuration;
+                    ExtractDetail = extractDetail;
                     DialogResult = true;
                 });
         }
@@ -245,52 +367,39 @@ namespace StairDrawer.UI
         {
             StairDrawingMode drawingMode = SelectedDrawingMode;
             StairPlanType stairType = SelectedStairType;
+            UTurnSteps turnSteps = ReadPreviewTurnSteps(stairType);
+            bool isPlan = drawingMode == StairDrawingMode.Plan;
+            DrawDetailButton.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
+            bool usesPlanLanding = HasStraightLanding || stairType != StairPlanType.Straight;
 
-            PlanFieldsPanel.Visibility = drawingMode == StairDrawingMode.Plan
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            PlanFieldsHeader.Text = usesPlanLanding
+                ? "Kích thước chiếu nghỉ và vế thang (mm)" : "Kích thước mặt bằng (mm)";
+            PlanCutHeightRow.Visibility = isPlan ? Visibility.Visible : Visibility.Collapsed;
+            DrawPlanRailingCheckBox.Visibility = isPlan ? Visibility.Visible : Visibility.Collapsed;
+            UTurnFieldsPanel.Visibility = stairType == StairPlanType.UShape ? Visibility.Visible : Visibility.Collapsed;
+            StraightLandingCheckBox.Visibility = stairType == StairPlanType.Straight ? Visibility.Visible : Visibility.Collapsed;
             SectionFieldsPanel.Visibility = drawingMode == StairDrawingMode.Section
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            LandingDepthRow.Visibility = stairType == StairPlanType.Straight
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-            FlightGapRow.Visibility = stairType == StairPlanType.UShape
+            LandingDepthRow.Visibility = HasSecondFlight ? Visibility.Visible : Visibility.Collapsed;
+            LandingDepthLabel.Text = HasStraightLanding ? "Chiều dài chiếu nghỉ (E)" : "Chiều sâu chiếu nghỉ (E)";
+            LandingDepthTextBox.ToolTip = HasStraightLanding ? "600–5000 mm" : "Không nhỏ hơn chiều rộng vế thang";
+            FlightGapRow.Visibility = stairType == StairPlanType.UShape && !turnSteps.HasMiddleFlight
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            SecondFlightRisersRow.Visibility = stairType == StairPlanType.Straight
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            SecondFlightRisersRow.Visibility = HasSecondFlight ? Visibility.Visible : Visibility.Collapsed;
+            SecondFlightRisersLabel.Text = turnSteps.HasSteps ? "Số cổ bậc vế trên (B)" : "Số cổ bậc vế 2 (B)";
+            SectionLandingLengthRow.Visibility = stairType == StairPlanType.LShape
+                ? Visibility.Collapsed : Visibility.Visible;
             RailingOptionsPanel.IsEnabled = drawingMode == StairDrawingMode.Section
                 && DrawRailingCheckBox.IsChecked == true;
 
             TotalRisersTextBox.IsReadOnly = true;
             TotalRisersLabel.Text = "Tổng số cổ bậc (tự tính)";
 
-            SynchronizeLandingPreviewFromForm();
+            SynchronizeTotalRisers();
             DrawPreview(drawingMode, stairType);
             UpdateRiserHeightHint();
-        }
-
-        private void SynchronizeLandingPreviewFromForm()
-        {
-            if (LandingPreviewTextBox == null)
-            {
-                return;
-            }
-
-            TextBox landingTextBox = SelectedDrawingMode == StairDrawingMode.Plan
-                ? LandingDepthTextBox
-                : LandingLengthTextBox;
-            _isSynchronizingFields = true;
-            try
-            {
-                LandingPreviewTextBox.Text = landingTextBox.Text;
-            }
-            finally
-            {
-                _isSynchronizingFields = false;
-            }
         }
 
         private void InitializeRiserDistribution()
@@ -309,13 +418,14 @@ namespace StairDrawer.UI
             _isSynchronizingFields = true;
             try
             {
-                if (stairType == StairPlanType.Straight)
+                if (!HasSecondFlight)
                 {
                     FirstFlightRisersTextBox.Text = totalRisers.ToString(CultureInfo.CurrentCulture);
                     SecondFlightRisersTextBox.Text = "0";
                 }
                 else
                 {
+                    totalRisers = Math.Max(4, totalRisers - (int)ReadPreviewTurnSteps(stairType).TotalRisers);
                     int firstFlightRisers = totalRisers / 2;
                     FirstFlightRisersTextBox.Text = firstFlightRisers.ToString(CultureInfo.CurrentCulture);
                     SecondFlightRisersTextBox.Text = (totalRisers - firstFlightRisers).ToString(CultureInfo.CurrentCulture);
@@ -342,7 +452,7 @@ namespace StairDrawer.UI
             }
 
             int secondFlightRisers = 0;
-            if (SelectedStairType != StairPlanType.Straight
+            if (HasSecondFlight
                 && !int.TryParse(
                     SecondFlightRisersTextBox.Text.Trim(),
                     NumberStyles.Integer,
@@ -352,10 +462,23 @@ namespace StairDrawer.UI
                 return;
             }
 
+            long turnRisers = 0;
+            if (SelectedStairType == StairPlanType.UShape)
+            {
+                if (!TryParseInteger(MiddleFlightTreadsTextBox, out int middleTreads)
+                    || !TryParseInteger(FirstWinderRisersTextBox, out int firstWinder)
+                    || !TryParseInteger(SecondWinderRisersTextBox, out int secondWinder))
+                {
+                    return;
+                }
+
+                turnRisers = (long)middleTreads + (middleTreads > 0 ? 1 : 0) + firstWinder + secondWinder;
+            }
+
             _isSynchronizingFields = true;
             try
             {
-                TotalRisersTextBox.Text = (firstFlightRisers + secondFlightRisers)
+                TotalRisersTextBox.Text = (turnRisers + firstFlightRisers + secondFlightRisers)
                     .ToString(CultureInfo.CurrentCulture);
             }
             finally
@@ -369,9 +492,10 @@ namespace StairDrawer.UI
             PreviewGeometryCanvas.Children.Clear();
             PreviewValues values = ReadPreviewValues(drawingMode, stairType);
             DrawingModel drawing;
+            StairSectionCut cut;
             if (drawingMode == StairDrawingMode.Plan)
             {
-                drawing = StairPlanGeometry.Create(new StairPlanParameters(
+                var parameters = new StairPlanParameters(
                     stairType,
                     values.FloorHeight,
                     values.TotalRisers,
@@ -380,11 +504,17 @@ namespace StairDrawer.UI
                     values.StairWidth,
                     values.Landing,
                     values.FlightGap,
-                    values.PlanCutHeight));
+                    values.PlanCutHeight,
+                    values.TurnSteps,
+                    values.HasStraightLanding,
+                    DrawPlanRailingCheckBox.IsChecked == true,
+                    SelectedSectionCut);
+                cut = StairSectionCut.FromPlan(parameters);
+                drawing = StairPlanGeometry.Create(parameters);
             }
             else
             {
-                drawing = StairSectionGeometry.Create(new StairSectionParameters(
+                var parameters = new StairSectionParameters(
                     stairType,
                     values.FloorHeight,
                     values.TotalRisers,
@@ -395,63 +525,66 @@ namespace StairDrawer.UI
                     values.FinishThickness,
                     values.DrawRailing,
                     values.RailingType,
-                    values.RailingHeight));
+                    values.RailingHeight,
+                    values.TurnSteps,
+                    values.StairWidth,
+                    values.PlanLandingDepth,
+                    values.HasStraightLanding,
+                    values.FlightGap,
+                    SelectedSectionCut);
+                cut = StairSectionCut.FromSection(parameters);
+                drawing = StairSectionGeometry.Create(parameters);
             }
 
-            PreviewTransform transform = CreatePreviewTransform(drawing);
-            RenderDrawingModel(drawing, transform);
-            PositionDimensionEditors(drawingMode, stairType, values, transform);
+            PreviewTransform transform = _draggingSectionCut && drawingMode == StairDrawingMode.Plan
+                ? _planPreviewTransform
+                : CreatePreviewTransform(drawing, drawingMode, values);
+            if (drawingMode == StairDrawingMode.Section)
+            {
+                DrawSectionFloorLevels(values, transform);
+            }
+            else
+            {
+                _planPreviewCut = cut;
+                _planPreviewTransform = transform;
+            }
 
+            RenderDrawingModel(drawing, transform);
             if (drawingMode == StairDrawingMode.Plan)
             {
-                PreviewModeBadge.Text = "MẶT BẰNG · " + GetStairTypeLabel(stairType).ToUpperInvariant();
-                PreviewTitleTextBlock.Text = "Mặt bằng thang " + GetStairTypeLabel(stairType).ToLowerInvariant();
-                PreviewDescriptionTextBlock.Text = GetPlanDescription(stairType)
-                    + " Ký hiệu A–F tương ứng với bảng thông số bên trái.";
-                return;
+                DrawPlanDimensions(stairType, values, transform);
             }
 
-            PreviewModeBadge.Text = "MẶT CẮT · " + GetStairTypeLabel(stairType).ToUpperInvariant();
-            PreviewTitleTextBlock.Text = stairType == StairPlanType.Straight
-                ? "Mặt cắt thang thẳng"
-                : "Mặt cắt thang " + GetStairTypeLabel(stairType).ToLowerInvariant();
-            string sectionDescription = stairType == StairPlanType.Straight
-                ? "Vế thang được cắt qua, thể hiện đầy đủ bản BTCT, bậc xây và lớp hoàn thiện. Ký hiệu dùng bảng bên trái."
-                : "Vế 1 là phần bị cắt; vế 2 phía sau thể hiện bằng nét thấy. Ký hiệu dùng bảng thông số bên trái.";
-            PreviewDescriptionTextBlock.Text = values.DrawRailing
-                ? sectionDescription + " Lan can "
-                    + (values.RailingType == StairRailingType.Glass ? "kính" : "sắt")
-                    + " dùng chiều cao G."
-                : sectionDescription;
+            PreviewModeBadge.Text = (drawingMode == StairDrawingMode.Plan ? "MẶT BẰNG · " : "MẶT CẮT · ")
+                + GetStairTypeLabel(stairType).ToUpperInvariant();
         }
 
         private PreviewValues ReadPreviewValues(StairDrawingMode drawingMode, StairPlanType stairType)
         {
             int firstFlightRisers = ReadPreviewInteger(
                 FirstFlightRisersTextBox,
-                stairType == StairPlanType.Straight ? 20 : 10,
+                HasSecondFlight ? 10 : 20,
                 2,
-                stairType == StairPlanType.Straight ? 60 : 58);
-            int secondFlightRisers = stairType == StairPlanType.Straight
-                ? 0
-                : ReadPreviewInteger(SecondFlightRisersTextBox, 10, 2, 58);
+                HasSecondFlight ? 58 : 60);
+            int secondFlightRisers = HasSecondFlight ? ReadPreviewInteger(SecondFlightRisersTextBox, 10, 2, 58) : 0;
 
-            double floorHeight = ReadPreviewDouble(FloorHeightTextBox, 3300.0, MinimumFloorHeight, MaximumFloorHeight);
+            double floorHeight = ReadPreviewDouble(FloorHeightTextBox, 3600.0, MinimumFloorHeight, MaximumFloorHeight);
             double stairWidth = ReadPreviewDouble(StairWidthTextBox, 1000.0, MinimumStairWidth, MaximumStairWidth);
-            TextBox landingTextBox = drawingMode == StairDrawingMode.Plan
-                ? LandingDepthTextBox
-                : LandingLengthTextBox;
-            double landing = ReadPreviewDouble(landingTextBox, 1000.0, MinimumStairWidth, MaximumStairWidth);
-            if (drawingMode == StairDrawingMode.Plan && stairType != StairPlanType.Straight)
+            double planLandingDepth = ReadPreviewDouble(LandingDepthTextBox, 1000.0, MinimumStairWidth, MaximumStairWidth);
+            if (stairType != StairPlanType.Straight)
             {
-                landing = Math.Max(landing, stairWidth);
+                planLandingDepth = Math.Max(stairWidth, planLandingDepth);
             }
+            double landing = drawingMode == StairDrawingMode.Plan
+                ? planLandingDepth
+                : stairType == StairPlanType.LShape ? 1000.0
+                : ReadPreviewDouble(LandingLengthTextBox, 1000.0, MinimumStairWidth, MaximumStairWidth);
 
             return new PreviewValues(
                 floorHeight,
                 firstFlightRisers,
                 secondFlightRisers,
-                ReadPreviewDouble(TreadDepthTextBox, 270.0, MinimumTreadDepth, MaximumTreadDepth),
+                ReadPreviewDouble(TreadDepthTextBox, 250.0, MinimumTreadDepth, MaximumTreadDepth),
                 stairWidth,
                 landing,
                 ReadPreviewDouble(FlightGapTextBox, 100.0, 0.0, 1000.0),
@@ -460,17 +593,39 @@ namespace StairDrawer.UI
                 ReadPreviewDouble(FinishThicknessTextBox, 20.0, MinimumFinishThickness, MaximumFinishThickness),
                 drawingMode == StairDrawingMode.Section && DrawRailingCheckBox.IsChecked == true,
                 SelectedRailingType,
-                ReadPreviewDouble(RailingHeightTextBox, 900.0, MinimumRailingHeight, MaximumRailingHeight));
+                ReadPreviewDouble(RailingHeightTextBox, 900.0, MinimumRailingHeight, MaximumRailingHeight),
+                ReadPreviewTurnSteps(stairType),
+                planLandingDepth,
+                HasStraightLanding);
+        }
+
+        private UTurnSteps ReadPreviewTurnSteps(StairPlanType stairType)
+        {
+            if (stairType != StairPlanType.UShape)
+            {
+                return default;
+            }
+
+            int middleTreads = ReadPreviewInteger(MiddleFlightTreadsTextBox, 0, 0, 55);
+            return new UTurnSteps(
+                middleTreads == 0 ? 0 : middleTreads + 1,
+                ReadPreviewInteger(FirstWinderRisersTextBox, 0, 0, 56),
+                ReadPreviewInteger(SecondWinderRisersTextBox, 0, 0, 56));
         }
 
         private static int ReadPreviewInteger(TextBox textBox, int fallback, int minimum, int maximum)
         {
-            if (!int.TryParse(textBox.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out int value))
+            if (!TryParseInteger(textBox, out int value))
             {
                 return fallback;
             }
 
             return Math.Max(minimum, Math.Min(maximum, value));
+        }
+
+        private static bool TryParseInteger(TextBox textBox, out int value)
+        {
+            return int.TryParse(textBox.Text.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out value);
         }
 
         private static double ReadPreviewDouble(TextBox textBox, double fallback, double minimum, double maximum)
@@ -483,7 +638,8 @@ namespace StairDrawer.UI
             return Math.Max(minimum, Math.Min(maximum, value));
         }
 
-        private static PreviewTransform CreatePreviewTransform(DrawingModel drawing)
+        private PreviewTransform CreatePreviewTransform(
+            DrawingModel drawing, StairDrawingMode drawingMode, PreviewValues values)
         {
             double minimumX = double.PositiveInfinity;
             double minimumY = double.PositiveInfinity;
@@ -531,7 +687,15 @@ namespace StairDrawer.UI
                 maximumY = 1.0;
             }
 
-            return new PreviewTransform(minimumX, minimumY, maximumX, maximumY);
+            if (drawingMode == StairDrawingMode.Section)
+            {
+                minimumY = Math.Min(minimumY, values.FinishThickness);
+                maximumY = Math.Max(maximumY, values.FloorHeight + values.FinishThickness);
+            }
+
+            return new PreviewTransform(
+                minimumX, minimumY, maximumX, maximumY,
+                PreviewCanvas.ActualWidth, PreviewCanvas.ActualHeight, drawingMode == StairDrawingMode.Section);
         }
 
         private static void ExpandBounds(
@@ -553,7 +717,7 @@ namespace StairDrawer.UI
             {
                 Point start = transform.ToScreen(line.Start);
                 Point end = transform.ToScreen(line.End);
-                AddLine(
+                Line shape = AddLine(
                     start.X,
                     start.Y,
                     end.X,
@@ -561,6 +725,10 @@ namespace StairDrawer.UI
                     GetPreviewBrush(line.LayerName),
                     GetPreviewStrokeThickness(line.LayerName),
                     line.LayerName == StairLayers.PlanHidden);
+                if (line.LayerName == StairLayers.SectionTrace)
+                {
+                    shape.StrokeDashArray = new DoubleCollection { 11.0, 4.0, 1.0, 4.0 };
+                }
             }
 
             RenderPolylines(drawing, transform, false, false);
@@ -592,7 +760,7 @@ namespace StairDrawer.UI
                 {
                     Text = text.Text,
                     Foreground = GetPreviewBrush(text.LayerName),
-                    FontSize = Math.Max(7.0, Math.Min(11.0, text.Height * transform.Scale)),
+                    FontSize = Math.Max(3.0, Math.Min(16.0, text.Height * transform.Scale)),
                     RenderTransform = new RotateTransform(-text.Rotation * 180.0 / Math.PI),
                     RenderTransformOrigin = new Point(0.5, 0.5)
                 };
@@ -609,6 +777,8 @@ namespace StairDrawer.UI
             bool drawOnTop,
             bool occludesBackground)
         {
+            Brush brickHatch = null;
+            Brush concreteHatch = null;
             foreach (PolylinePrimitive polyline in drawing.Polylines)
             {
                 if (polyline.DrawOnTop != drawOnTop
@@ -623,6 +793,22 @@ namespace StairDrawer.UI
                     points.Add(transform.ToScreen(vertex));
                 }
 
+                Brush fill = GetPreviewFill(polyline.LayerName);
+                if (polyline.Closed && polyline.LayerName == StairLayers.Brick)
+                {
+                    brickHatch = brickHatch ?? CreateBrickHatchBrush(transform.Scale);
+                    fill = brickHatch;
+                }
+                else if (polyline.Closed && polyline.LayerName == StairLayers.Concrete)
+                {
+                    concreteHatch = concreteHatch ?? CreateConcreteHatchBrush(transform.Scale);
+                    fill = concreteHatch;
+                }
+                else if (polyline.Closed && polyline.LayerName == StairLayers.RailingGlass)
+                {
+                    RenderGlassHatch(polyline, transform);
+                }
+
                 AddPolyline(
                     points,
                     GetPreviewBrush(polyline.LayerName),
@@ -630,9 +816,120 @@ namespace StairDrawer.UI
                         ? Math.Max(2.0, polyline.GlobalWidth * transform.Scale)
                         : GetPreviewStrokeThickness(polyline.LayerName),
                     polyline.Closed,
-                    GetPreviewFill(polyline.LayerName),
+                    fill,
                     polyline.LayerName == StairLayers.PlanHidden);
             }
+        }
+
+        private void RenderGlassHatch(PolylinePrimitive panel, PreviewTransform transform)
+        {
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            var clip = new StreamGeometry();
+            using (StreamGeometryContext context = clip.Open())
+            {
+                context.BeginFigure(transform.ToScreen(panel.Vertices[0]), true, true);
+                for (int i = 0; i < panel.Vertices.Count; i++)
+                {
+                    Point2 vertex = panel.Vertices[i];
+                    minX = Math.Min(minX, vertex.X); maxX = Math.Max(maxX, vertex.X);
+                    minY = Math.Min(minY, vertex.Y); maxY = Math.Max(maxY, vertex.Y);
+                    if (i > 0) context.LineTo(transform.ToScreen(vertex), true, false);
+                }
+            }
+
+            // Metric AR-RROOF definitions from acadiso.pat, at hatch scale 10.
+            var lines = new GeometryGroup();
+            AddGlassHatchRows(lines, transform, minX, maxX, minY, maxY,
+                0, 0, 558.8, 254, new[] { 3810.0, -508, 1270, -254 });
+            AddGlassHatchRows(lines, transform, minX, maxX, minY, maxY,
+                337.82, 127, -254, 337.82, new[] { 762.0, -83.82, 1524, -190.5 });
+            AddGlassHatchRows(lines, transform, minX, maxX, minY, maxY,
+                127, 215.9, 1320.8, 170.18, new[] { 2032.0, -355.6, 1016, -254 });
+            PreviewGeometryCanvas.Children.Add(new Path
+            {
+                Data = lines, Clip = clip, Stroke = PreviewGlassBrush, StrokeThickness = 0.8,
+                Opacity = 64.0 / 255.0, IsHitTestVisible = false
+            });
+        }
+
+        private static void AddGlassHatchRows(GeometryGroup lines, PreviewTransform transform,
+            double minX, double maxX, double minY, double maxY,
+            double originX, double originY, double offsetX, double offsetY, double[] dashes)
+        {
+            double period = 0;
+            foreach (double dash in dashes) period += Math.Abs(dash);
+            int first = (int)Math.Ceiling((minY - originY) / offsetY);
+            int last = (int)Math.Floor((maxY - originY) / offsetY);
+            for (int row = first; row <= last; row++)
+            {
+                double y = originY + row * offsetY;
+                double rowX = originX + row * offsetX;
+                double start = rowX + Math.Floor((minX - rowX) / period) * period;
+                for (double cycle = start; cycle < maxX; cycle += period)
+                {
+                    double x = cycle;
+                    foreach (double dash in dashes)
+                    {
+                        double end = x + Math.Abs(dash);
+                        if (dash > 0 && end > minX && x < maxX)
+                            lines.Children.Add(new LineGeometry(
+                                transform.ToScreen(new Point2(Math.Max(minX, x), y)),
+                                transform.ToScreen(new Point2(Math.Min(maxX, end), y))));
+                        x = end;
+                    }
+                }
+            }
+        }
+
+        private static Brush CreateBrickHatchBrush(double scale)
+        {
+            double side = Math.Max(5.0, 12.7 * Math.Sqrt(2.0) * scale);
+            var diagonal = new LineGeometry(new Point(0.0, side), new Point(side, 0.0));
+            var tile = new Rect(0.0, 0.0, side, side);
+            return new DrawingBrush(new GeometryDrawing(null, new Pen(PreviewBrickBrush, 0.7), diagonal))
+            {
+                TileMode = TileMode.Tile,
+                Viewbox = tile,
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewport = tile,
+                ViewportUnits = BrushMappingMode.Absolute
+            };
+        }
+
+        private static Brush CreateConcreteHatchBrush(double scale)
+        {
+            double side = Math.Max(8.0, 37.5 * Math.Sqrt(2.0) * scale);
+            double offset = side / 3.0;
+            var lines = new GeometryGroup
+            {
+                Children = new GeometryCollection
+                {
+                    new LineGeometry(new Point(0.0, side), new Point(side, 0.0)),
+                    new LineGeometry(new Point(0.0, offset), new Point(offset, 0.0)),
+                    new LineGeometry(new Point(offset, side), new Point(side, offset)),
+                    new LineGeometry(new Point(side * 0.32, side * 0.28), new Point(side * 0.43, side * 0.34)),
+                    new LineGeometry(new Point(side * 0.43, side * 0.34), new Point(side * 0.38, side * 0.43)),
+                    new LineGeometry(new Point(side * 0.38, side * 0.43), new Point(side * 0.32, side * 0.28))
+                }
+            };
+            var tile = new Rect(0.0, 0.0, side, side);
+            var drawing = new DrawingGroup
+            {
+                Children = new DrawingCollection
+                {
+                    new GeometryDrawing(PreviewConcreteFillBrush, null, new RectangleGeometry(tile)),
+                    new GeometryDrawing(null, new Pen(PreviewConcreteBrush, 0.65), lines)
+                }
+            };
+            return new DrawingBrush(drawing)
+            {
+                TileMode = TileMode.Tile,
+                Viewbox = tile,
+                ViewboxUnits = BrushMappingMode.Absolute,
+                Viewport = tile,
+                ViewportUnits = BrushMappingMode.Absolute
+            };
         }
 
         private void RenderWipeouts(DrawingModel drawing, PreviewTransform transform)
@@ -654,183 +951,162 @@ namespace StairDrawer.UI
             }
         }
 
-        private void PositionDimensionEditors(
-            StairDrawingMode drawingMode,
-            StairPlanType stairType,
-            PreviewValues values,
-            PreviewTransform transform)
-        {
-            bool hasSecondFlight = stairType != StairPlanType.Straight;
-            FirstFlightRisersDimensionBorder.Visibility = Visibility.Visible;
-            SecondFlightRisersDimensionBorder.Visibility = hasSecondFlight ? Visibility.Visible : Visibility.Collapsed;
-            TreadDepthDimensionBorder.Visibility = Visibility.Visible;
-            StairWidthDimensionBorder.Visibility = drawingMode == StairDrawingMode.Plan ? Visibility.Visible : Visibility.Collapsed;
-            LandingDimensionBorder.Visibility = drawingMode == StairDrawingMode.Section || hasSecondFlight
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            FlightGapDimensionBorder.Visibility = drawingMode == StairDrawingMode.Plan && stairType == StairPlanType.UShape
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            RailingHeightDimensionBorder.Visibility = drawingMode == StairDrawingMode.Section && values.DrawRailing
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
-            if (drawingMode == StairDrawingMode.Section)
-            {
-                PositionSectionDimensionEditors(stairType, values, transform);
-                return;
-            }
-
-            PositionPlanDimensionEditors(stairType, values, transform);
-        }
-
-        private void PositionPlanDimensionEditors(
-            StairPlanType stairType,
-            PreviewValues values,
-            PreviewTransform transform)
+        private void DrawPlanDimensions(StairPlanType stairType, PreviewValues values, PreviewTransform transform)
         {
             double firstRun = GetPreviewFlightRun(values.FirstFlightRisers, values.TreadDepth);
-            double secondRun = stairType == StairPlanType.Straight
-                ? 0.0
-                : GetPreviewFlightRun(values.SecondFlightRisers, values.TreadDepth);
-            double firstStartX = stairType == StairPlanType.UShape
-                ? Math.Max(firstRun, secondRun) - firstRun
+            double secondRun = values.SecondFlightRisers > 0
+                ? GetPreviewFlightRun(values.SecondFlightRisers, values.TreadDepth)
                 : 0.0;
-            PlaceDimensionEditor(
-                FirstFlightRisersDimensionBorder,
-                new Point2(firstStartX, 0.0),
-                new Point2(firstStartX + firstRun, 0.0),
-                new Vector(0.0, 22.0),
-                transform);
-            PlaceDimensionEditor(
-                TreadDepthDimensionBorder,
-                new Point2(firstStartX, values.StairWidth),
-                new Point2(firstStartX + values.TreadDepth, values.StairWidth),
-                new Vector(0.0, -18.0),
-                transform);
-            PlaceDimensionEditor(
-                StairWidthDimensionBorder,
-                new Point2(firstStartX, 0.0),
-                new Point2(firstStartX, values.StairWidth),
-                new Vector(-22.0, 0.0),
-                transform);
 
-            if (stairType == StairPlanType.Straight)
+            double length = firstRun;
+            double width = values.StairWidth;
+            double firstStartX = 0.0;
+            double gap = values.TurnSteps.GetGap(values.FlightGap, values.TreadDepth);
+            switch (stairType)
+            {
+                case StairPlanType.Straight:
+                    if (values.HasStraightLanding)
+                    {
+                        length += values.Landing + secondRun;
+                    }
+                    break;
+                case StairPlanType.LShape:
+                    length += values.Landing;
+                    width += secondRun;
+                    break;
+                case StairPlanType.UShape:
+                    double maximumRun = Math.Max(firstRun, secondRun);
+                    firstStartX = maximumRun - firstRun;
+                    length = maximumRun + values.Landing;
+                    width = (width * 2.0) + gap;
+                    break;
+            }
+
+            double below = transform.DrawingBottom + 5.0;
+            double above = transform.DrawingTop - 5.0;
+            double right = transform.DrawingRight + 5.0;
+            DrawPlanHorizontalDimension(0.0, length, below, 40.0, transform);
+            DrawMeasuredPreviewDimension(
+                new Point(right, transform.ToScreen(new Point2(0.0, 0.0)).Y),
+                new Point(right, transform.ToScreen(new Point2(0.0, width)).Y),
+                new Vector(35.0, 0.0), FormatDimension(width), transform, verticalText: true);
+
+            if (secondRun <= 0.0)
             {
                 return;
             }
 
-            if (stairType == StairPlanType.LShape)
-            {
-                double secondStartX = firstRun + ((values.Landing - values.StairWidth) * 0.5);
-                PlaceDimensionEditor(
-                    SecondFlightRisersDimensionBorder,
-                    new Point2(secondStartX, values.StairWidth),
-                    new Point2(secondStartX, values.StairWidth + secondRun),
-                    new Vector(42.0, 0.0),
-                    transform);
-                PlaceDimensionEditor(
-                    LandingDimensionBorder,
-                    new Point2(firstRun, values.StairWidth),
-                    new Point2(firstRun + values.Landing, values.StairWidth),
-                    new Vector(0.0, -24.0),
-                    transform);
-                return;
-            }
+            double lowerEnd = firstStartX + firstRun;
+            DrawPlanHorizontalDimension(firstStartX, lowerEnd, below, 15.0, transform);
+            DrawPlanHorizontalDimension(lowerEnd, lowerEnd + values.Landing, below, 15.0, transform);
 
-            double maximumRun = Math.Max(firstRun, secondRun);
-            double totalWidth = (values.StairWidth * 2.0) + values.FlightGap;
-            PlaceDimensionEditor(
-                SecondFlightRisersDimensionBorder,
-                new Point2(maximumRun, totalWidth),
-                new Point2(maximumRun - secondRun, totalWidth),
-                new Vector(0.0, -22.0),
-                transform);
-            PlaceDimensionEditor(
-                LandingDimensionBorder,
-                new Point2(maximumRun, 0.0),
-                new Point2(maximumRun + values.Landing, 0.0),
-                new Vector(0.0, 24.0),
-                transform);
-            PlaceDimensionEditor(
-                FlightGapDimensionBorder,
-                new Point2(maximumRun * 0.55, values.StairWidth),
-                new Point2(maximumRun * 0.55, values.StairWidth + Math.Max(values.FlightGap, 1.0)),
-                new Vector(0.0, 0.0),
-                transform);
+            if (values.HasStraightLanding)
+            {
+                DrawPlanHorizontalDimension(lowerEnd + values.Landing, length, below, 15.0, transform);
+            }
+            else if (stairType == StairPlanType.UShape)
+            {
+                DrawPlanHorizontalDimension(lowerEnd - secondRun, lowerEnd, above, -14.0, transform);
+                if (gap > 1e-6)
+                {
+                    DrawMeasuredPreviewDimension(
+                        new Point(right, transform.ToScreen(new Point2(0.0, values.StairWidth)).Y),
+                        new Point(right, transform.ToScreen(new Point2(0.0, values.StairWidth + gap)).Y),
+                        new Vector(12.0, 0.0), FormatDimension(gap), transform, verticalText: true);
+                }
+            }
+            else
+            {
+                DrawMeasuredPreviewDimension(
+                    new Point(right, transform.ToScreen(new Point2(0.0, values.StairWidth)).Y),
+                    new Point(right, transform.ToScreen(new Point2(0.0, width)).Y),
+                    new Vector(12.0, 0.0), FormatDimension(secondRun), transform, verticalText: true);
+            }
         }
 
-        private void PositionSectionDimensionEditors(
-            StairPlanType stairType,
-            PreviewValues values,
-            PreviewTransform transform)
+        private void DrawPlanHorizontalDimension(double startX, double endX, double y, double offset, PreviewTransform transform)
         {
-            double firstRun = GetPreviewFlightRun(values.FirstFlightRisers, values.TreadDepth);
-            PlaceDimensionEditor(
-                FirstFlightRisersDimensionBorder,
-                new Point2(0.0, 0.0),
-                new Point2(firstRun, 0.0),
-                new Vector(0.0, 22.0),
-                transform);
-            PlaceDimensionEditor(
-                TreadDepthDimensionBorder,
-                new Point2(0.0, 0.0),
-                new Point2(values.TreadDepth, 0.0),
-                new Vector(0.0, -22.0),
-                transform);
-
-            if (values.DrawRailing)
+            Point start = new Point(transform.ToScreen(new Point2(startX, 0.0)).X, y);
+            Point end = new Point(transform.ToScreen(new Point2(endX, 0.0)).X, y);
+            if (Math.Abs(offset) <= 15.0 && end.X - start.X < 58.0)
             {
-                double riserHeight = values.FloorHeight / values.TotalRisers;
-                double railingBaseElevation = riserHeight + values.FinishThickness;
-                PlaceDimensionEditor(
-                    RailingHeightDimensionBorder,
-                    new Point2(0.0, railingBaseElevation),
-                    new Point2(0.0, railingBaseElevation + values.RailingHeight),
-                    new Vector(-34.0, 0.0),
-                    transform);
-            }
-
-            if (stairType == StairPlanType.Straight)
-            {
-                PlaceDimensionEditor(
-                    LandingDimensionBorder,
-                    new Point2(firstRun, values.FloorHeight),
-                    new Point2(firstRun + values.Landing, values.FloorHeight),
-                    new Vector(0.0, -22.0),
-                    transform);
+                DrawPreviewDimension(start, end, new Vector(0.0, offset));
                 return;
             }
 
-            double firstLandingElevation = values.FirstFlightRisers * (values.FloorHeight / values.TotalRisers);
-            double secondStartX = firstRun;
-            double secondRun = GetPreviewFlightRun(values.SecondFlightRisers, values.TreadDepth);
-            double secondEndX = stairType == StairPlanType.UShape
-                ? secondStartX - secondRun
-                : secondStartX + secondRun;
-            PlaceDimensionEditor(
-                SecondFlightRisersDimensionBorder,
-                new Point2(secondStartX, firstLandingElevation),
-                new Point2(secondEndX, values.FloorHeight),
-                new Vector(0.0, -24.0),
-                transform);
-            PlaceDimensionEditor(
-                LandingDimensionBorder,
-                new Point2(firstRun, firstLandingElevation),
-                new Point2(firstRun + values.Landing, firstLandingElevation),
-                new Vector(0.0, 24.0),
-                transform);
+            DrawMeasuredPreviewDimension(start, end, new Vector(0.0, offset), FormatDimension(endX - startX), transform);
         }
 
-        private void PlaceDimensionEditor(
-            FrameworkElement editor,
-            Point2 firstWorldPoint,
-            Point2 secondWorldPoint,
-            Vector screenOffset,
-            PreviewTransform transform)
+        private void DrawSectionFloorLevels(PreviewValues values, PreviewTransform transform)
         {
-            Point firstPoint = transform.ToScreen(firstWorldPoint);
-            Point secondPoint = transform.ToScreen(secondWorldPoint);
+            double bottom = values.FinishThickness;
+            double top = bottom + values.FloorHeight;
+            double left = transform.ToScreen(new Point2(transform.MinimumX, bottom)).X;
+            double right = transform.ToScreen(new Point2(transform.MaximumX, bottom)).X;
+            double axisStart = Math.Max(6.0, left - 67.0);
+            double axisEnd = right + 13.0;
+            double bottomY = transform.ToScreen(new Point2(0.0, bottom)).Y;
+            double topY = transform.ToScreen(new Point2(0.0, top)).Y;
+            DrawFloorAxis(axisStart, axisEnd, bottomY, "±0.000", transform);
+            DrawFloorAxis(
+                axisStart, axisEnd, topY,
+                "+" + (values.FloorHeight / 1000.0).ToString("0.000", CultureInfo.InvariantCulture), transform);
+            DrawMeasuredPreviewDimension(
+                new Point(axisEnd, bottomY), new Point(axisEnd, topY),
+                new Vector(23.0, 0.0), FormatDimension(values.FloorHeight), transform, verticalText: true);
+        }
+
+        private void DrawFloorAxis(double startX, double endX, double y, string level, PreviewTransform transform)
+        {
+            PreviewGeometryCanvas.Children.Add(new Line
+            {
+                X1 = startX, Y1 = y, X2 = endX, Y2 = y,
+                Stroke = PreviewHiddenBrush, StrokeThickness = 1.0,
+                StrokeDashArray = new DoubleCollection { 11.0, 4.0, 1.0, 4.0 }
+            });
+            AddPolyline(
+                new[] { new Point(startX + 5.0, y - 6.0), new Point(startX + 11.0, y), new Point(startX + 17.0, y - 6.0) },
+                PreviewHiddenBrush, 1.0);
+            DrawPreviewLabel(new Point(startX + 42.0, y - 10.0), level, transform);
+        }
+
+        private void DrawMeasuredPreviewDimension(
+            Point first, Point second, Vector offset, string text, PreviewTransform transform, bool verticalText = false)
+        {
+            Point center = DrawPreviewDimension(first, second, offset);
+            DrawPreviewLabel(center, text, transform, verticalText);
+        }
+
+        private static string FormatDimension(double millimeters)
+        {
+            return millimeters.ToString("0.##", CultureInfo.CurrentCulture) + " mm";
+        }
+
+        private void DrawPreviewLabel(Point center, string text, PreviewTransform transform, bool verticalText = false)
+        {
+            var label = new TextBlock
+            {
+                Text = text,
+                FontSize = 11.0,
+                Foreground = PreviewSecondaryBrush
+            };
+            if (verticalText)
+            {
+                label.LayoutTransform = new RotateTransform(-90.0);
+            }
+
+            var badge = new Border
+            {
+                Background = PreviewWipeoutBrush,
+                Padding = new Thickness(4.0, 1.0, 4.0, 1.0),
+                Child = label
+            };
+            PlaceEditorAt(badge, center, transform);
+            PreviewGeometryCanvas.Children.Add(badge);
+        }
+
+        private Point DrawPreviewDimension(Point firstPoint, Point secondPoint, Vector screenOffset)
+        {
             Point firstDimensionPoint = firstPoint + screenOffset;
             Point secondDimensionPoint = secondPoint + screenOffset;
             AddLine(firstPoint.X, firstPoint.Y, firstDimensionPoint.X, firstDimensionPoint.Y, PreviewHiddenBrush, 1.0);
@@ -846,19 +1122,18 @@ namespace StairDrawer.UI
                 AddLine(secondDimensionPoint.X - tick.X, secondDimensionPoint.Y - tick.Y, secondDimensionPoint.X + tick.X, secondDimensionPoint.Y + tick.Y, PreviewPrimaryBrush, 1.2);
             }
 
-            Point center = new Point(
+            return new Point(
                 (firstDimensionPoint.X + secondDimensionPoint.X) * 0.5,
                 (firstDimensionPoint.Y + secondDimensionPoint.Y) * 0.5);
-            PlaceEditorAt(editor, center);
         }
 
-        private static void PlaceEditorAt(FrameworkElement editor, Point center)
+        private static void PlaceEditorAt(FrameworkElement editor, Point center, PreviewTransform transform)
         {
             editor.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            double width = Math.Max(36.0, editor.DesiredSize.Width);
-            double height = Math.Max(16.0, editor.DesiredSize.Height);
-            Canvas.SetLeft(editor, Math.Max(2.0, Math.Min(458.0 - width, center.X - (width * 0.5))));
-            Canvas.SetTop(editor, Math.Max(2.0, Math.Min(278.0 - height, center.Y - (height * 0.5))));
+            double width = editor.DesiredSize.Width;
+            double height = editor.DesiredSize.Height;
+            Canvas.SetLeft(editor, Math.Max(2.0, Math.Min(transform.Width - 2.0 - width, center.X - (width * 0.5))));
+            Canvas.SetTop(editor, Math.Max(2.0, Math.Min(transform.Height - 2.0 - height, center.Y - (height * 0.5))));
         }
 
         private static double GetPreviewFlightRun(int risers, double treadDepth)
@@ -868,6 +1143,11 @@ namespace StairDrawer.UI
 
         private static Brush GetPreviewBrush(string layerName)
         {
+            if (layerName == StairLayers.SectionTrace || layerName == StairLayers.SectionTraceMark)
+            {
+                return PreviewSectionTraceBrush;
+            }
+
             if (layerName == StairLayers.PlanHidden)
             {
                 return PreviewHiddenBrush;
@@ -913,9 +1193,8 @@ namespace StairDrawer.UI
 
         private static Brush GetPreviewFill(string layerName)
         {
-            return layerName == StairLayers.Concrete
-                ? PreviewConcreteFillBrush
-                : Brushes.Transparent;
+            if (layerName == StairLayers.Concrete) return PreviewConcreteFillBrush;
+            return Brushes.Transparent;
         }
 
         private static double GetPreviewStrokeThickness(string layerName)
@@ -943,7 +1222,7 @@ namespace StairDrawer.UI
             return 1.2;
         }
 
-        private void AddLine(
+        private Line AddLine(
             double x1,
             double y1,
             double x2,
@@ -969,6 +1248,7 @@ namespace StairDrawer.UI
             }
 
             PreviewGeometryCanvas.Children.Add(line);
+            return line;
         }
 
         private void AddPolyline(
@@ -1003,34 +1283,34 @@ namespace StairDrawer.UI
             ResetValidationState();
 
             StairPlanType stairType = SelectedStairType;
+            bool hasStraightLanding = HasStraightLanding;
             if (!TryReadDouble(FloorHeightTextBox, "Chiều cao tầng", MinimumFloorHeight, MaximumFloorHeight, out double floorHeight)
                 || !TryReadDouble(TreadDepthTextBox, "Chiều rộng mặt bậc", MinimumTreadDepth, MaximumTreadDepth, out double treadDepth)
-                || !TryReadFlightRisers(stairType, out int firstFlightRisers, out int secondFlightRisers))
+                || !TryReadFlightRisers(out int firstFlightRisers, out int secondFlightRisers)
+                || !TryReadTurnSteps(stairType, out UTurnSteps turnSteps))
             {
                 return false;
             }
 
-            int totalRisers = firstFlightRisers + secondFlightRisers;
-
-            if (SelectedDrawingMode == StairDrawingMode.Plan)
+            int totalRisers = firstFlightRisers + secondFlightRisers + (int)turnSteps.TotalRisers;
+            if (totalRisers > 60)
             {
-                if (!TryReadDouble(StairWidthTextBox, "Chiều rộng vế thang", MinimumStairWidth, MaximumStairWidth, out double stairWidth)
-                    || !TryReadDouble(PlanCutHeightTextBox, "Cao độ mặt phẳng cắt", 100.0, floorHeight - 1.0, out double planCutHeight))
-                {
-                    return false;
-                }
+                ShowValidationError(SecondFlightRisersTextBox, "Tổng số cổ bậc không được vượt quá 60.");
+                return false;
+            }
 
-                double landingDepth = stairWidth;
-                if (stairType != StairPlanType.Straight
-                    && (!TryReadDouble(LandingDepthTextBox, "Chiều sâu chiếu nghỉ", MinimumStairWidth, MaximumStairWidth, out landingDepth)
-                        || !ValidateLandingDepth(landingDepth, stairWidth)))
-                {
-                    return false;
-                }
+            bool isPlan = SelectedDrawingMode == StairDrawingMode.Plan;
+            double stairWidth = 0.0;
+            double landingDepth = 0.0;
+            double flightGap = 0.0;
+            if (!TryReadPlanDimensions(stairType, turnSteps, out stairWidth, out landingDepth, out flightGap))
+            {
+                return false;
+            }
 
-                double flightGap = 0.0;
-                if (stairType == StairPlanType.UShape
-                    && !TryReadDouble(FlightGapTextBox, "Khe giữa hai vế", 0.0, 1000.0, out flightGap))
+            if (isPlan)
+            {
+                if (!TryReadDouble(PlanCutHeightTextBox, "Cao độ mặt phẳng cắt", 100.0, floorHeight - 1.0, out double planCutHeight))
                 {
                     return false;
                 }
@@ -1044,13 +1324,19 @@ namespace StairDrawer.UI
                     stairWidth,
                     landingDepth,
                     flightGap,
-                    planCutHeight));
+                    planCutHeight,
+                    turnSteps,
+                    hasStraightLanding,
+                    DrawPlanRailingCheckBox.IsChecked == true,
+                    SelectedSectionCut));
             }
             else
             {
-                if (!TryReadDouble(LandingLengthTextBox, "Chiều dài chiếu nghỉ", MinimumStairWidth, MaximumStairWidth, out double landingLength)
+                double landingLength = 1000.0;
+                if ((stairType != StairPlanType.LShape
+                        && !TryReadDouble(LandingLengthTextBox, SectionLandingLengthLabel.Text, MinimumStairWidth, MaximumStairWidth, out landingLength))
                     || !TryReadDouble(SlabThicknessTextBox, "Chiều dày bản BTCT", MinimumSlabThickness, MaximumSlabThickness, out double slabThickness)
-                    || !TryReadDouble(FinishThicknessTextBox, "Chiều dày hoàn thiện", MinimumFinishThickness, MaximumFinishThickness, out double finishThickness))
+                    || !TryReadDouble(FinishThicknessTextBox, "Chiều dày đá ốp", MinimumFinishThickness, MaximumFinishThickness, out double finishThickness))
                 {
                     return false;
                 }
@@ -1079,7 +1365,13 @@ namespace StairDrawer.UI
                     finishThickness,
                     drawRailing,
                     SelectedRailingType,
-                    railingHeight));
+                    railingHeight,
+                    turnSteps,
+                    stairWidth,
+                    landingDepth,
+                    hasStraightLanding,
+                    flightGap,
+                    SelectedSectionCut));
             }
 
             double riserHeight = floorHeight / totalRisers;
@@ -1094,12 +1386,11 @@ namespace StairDrawer.UI
         }
 
         private bool TryReadFlightRisers(
-            StairPlanType stairType,
             out int firstFlightRisers,
             out int secondFlightRisers)
         {
             secondFlightRisers = 0;
-            int maximumFirstFlightRisers = stairType == StairPlanType.Straight ? 60 : 58;
+            int maximumFirstFlightRisers = HasSecondFlight ? 58 : 60;
             if (!TryReadInteger(
                 FirstFlightRisersTextBox,
                 "Số cổ bậc vế 1",
@@ -1110,30 +1401,58 @@ namespace StairDrawer.UI
                 return false;
             }
 
-            if (stairType == StairPlanType.Straight)
+            if (!HasSecondFlight)
             {
                 return true;
             }
 
-            if (!TryReadInteger(
+            return TryReadInteger(
                 SecondFlightRisersTextBox,
-                "Số cổ bậc vế 2",
+                SecondFlightRisersLabel.Text,
                 2,
                 58,
-                out secondFlightRisers))
+                out secondFlightRisers);
+        }
+
+        private bool TryReadTurnSteps(StairPlanType stairType, out UTurnSteps steps)
+        {
+            steps = default;
+            if (stairType != StairPlanType.UShape)
+            {
+                return true;
+            }
+
+            if (!TryReadInteger(MiddleFlightTreadsTextBox, "Số mặt bậc vế giữa", 0, 55, out int middleTreads)
+                || !TryReadInteger(FirstWinderRisersTextBox, "Số cổ bậc chéo chiếu 1", 0, 56, out int firstWinder)
+                || !TryReadInteger(SecondWinderRisersTextBox, "Số cổ bậc chéo chiếu 2", 0, 56, out int secondWinder))
             {
                 return false;
             }
 
-            if (firstFlightRisers + secondFlightRisers <= 60)
+            steps = new UTurnSteps(middleTreads == 0 ? 0 : middleTreads + 1, firstWinder, secondWinder);
+            return true;
+        }
+
+        private bool TryReadPlanDimensions(
+            StairPlanType stairType, UTurnSteps steps, out double width, out double depth, out double gap)
+        {
+            depth = 0.0;
+            gap = 0.0;
+            if (!TryReadDouble(StairWidthTextBox, "Chiều rộng vế thang", MinimumStairWidth, MaximumStairWidth, out width))
             {
-                return true;
+                return false;
             }
 
-            ShowValidationError(
-                SecondFlightRisersTextBox,
-                "Tổng số cổ bậc của hai vế không được vượt quá 60.");
-            return false;
+            depth = width;
+            if (HasSecondFlight
+                && (!TryReadDouble(LandingDepthTextBox, LandingDepthLabel.Text, MinimumStairWidth, MaximumStairWidth, out depth)
+                    || (stairType != StairPlanType.Straight && !ValidateLandingDepth(depth, width))))
+            {
+                return false;
+            }
+
+            return stairType != StairPlanType.UShape || steps.HasMiddleFlight
+                || TryReadDouble(FlightGapTextBox, "Khe giữa hai vế song song", 0.0, 1000.0, out gap);
         }
 
         private bool ValidateLandingDepth(double landingDepth, double stairWidth)
@@ -1289,19 +1608,6 @@ namespace StairDrawer.UI
             }
         }
 
-        private static string GetPlanDescription(StairPlanType stairType)
-        {
-            switch (stairType)
-            {
-                case StairPlanType.Straight:
-                    return "Một vế thang liên tục; nét cắt, số bậc và đường chỉ hướng được tạo theo cao độ mặt phẳng cắt.";
-                case StairPlanType.LShape:
-                    return "Hai vế thang vuông góc, nối bằng chiếu nghỉ; đường chỉ hướng chạy liên tục qua cả hai vế.";
-                default:
-                    return "Hai vế thang song song, nối qua chiếu nghỉ; có thể điều chỉnh khe giữa hai vế.";
-            }
-        }
-
         private void ExecuteUiAction(string context, Action action)
         {
             try
@@ -1334,7 +1640,10 @@ namespace StairDrawer.UI
                 double finishThickness,
                 bool drawRailing,
                 StairRailingType railingType,
-                double railingHeight)
+                double railingHeight,
+                UTurnSteps turnSteps,
+                double planLandingDepth,
+                bool hasStraightLanding)
             {
                 FloorHeight = floorHeight;
                 FirstFlightRisers = firstFlightRisers;
@@ -1349,6 +1658,9 @@ namespace StairDrawer.UI
                 DrawRailing = drawRailing;
                 RailingType = railingType;
                 RailingHeight = railingHeight;
+                TurnSteps = turnSteps;
+                PlanLandingDepth = planLandingDepth;
+                HasStraightLanding = hasStraightLanding;
             }
 
             public double FloorHeight { get; }
@@ -1357,7 +1669,7 @@ namespace StairDrawer.UI
 
             public int SecondFlightRisers { get; }
 
-            public int TotalRisers => FirstFlightRisers + SecondFlightRisers;
+            public int TotalRisers => FirstFlightRisers + SecondFlightRisers + (int)TurnSteps.TotalRisers;
 
             public double TreadDepth { get; }
 
@@ -1378,48 +1690,78 @@ namespace StairDrawer.UI
             public StairRailingType RailingType { get; }
 
             public double RailingHeight { get; }
+
+            public UTurnSteps TurnSteps { get; }
+
+            public double PlanLandingDepth { get; }
+
+            public bool HasStraightLanding { get; }
         }
 
         private sealed class PreviewTransform
         {
-            private const double CanvasLeft = 52.0;
-            private const double CanvasTop = 28.0;
-            private const double CanvasRight = 408.0;
-            private const double CanvasBottom = 242.0;
-
             private readonly double _worldCenterX;
             private readonly double _worldCenterY;
+            private readonly double _screenCenterX;
+            private readonly double _screenCenterY;
+            private readonly double _minimumY;
+            private readonly double _maximumY;
 
             public PreviewTransform(
                 double minimumX,
                 double minimumY,
                 double maximumX,
-                double maximumY)
+                double maximumY,
+                double viewportWidth,
+                double viewportHeight,
+                bool section)
             {
+                Width = viewportWidth > 1.0 ? viewportWidth : 460.0;
+                Height = viewportHeight > 1.0 ? viewportHeight : 280.0;
+                MinimumX = minimumX;
+                MaximumX = maximumX;
+                _minimumY = minimumY;
+                _maximumY = maximumY;
                 double worldWidth = Math.Max(1.0, maximumX - minimumX);
                 double worldHeight = Math.Max(1.0, maximumY - minimumY);
+                double left = Math.Min(section ? 79.0 : 38.0, Width * 0.18);
+                double right = Math.Min(53.0, Width * 0.16);
+                double top = Math.Min(36.0, Height * 0.12);
+                double bottom = Math.Min(section ? 36.0 : 59.0, Height * 0.22);
                 Scale = Math.Min(
-                    (CanvasRight - CanvasLeft) / worldWidth,
-                    (CanvasBottom - CanvasTop) / worldHeight);
+                    (Width - left - right) / worldWidth,
+                    (Height - top - bottom) / worldHeight);
                 _worldCenterX = (minimumX + maximumX) * 0.5;
                 _worldCenterY = (minimumY + maximumY) * 0.5;
+                _screenCenterX = (Width + left - right) * 0.5;
+                _screenCenterY = (Height + top - bottom) * 0.5;
             }
 
             public double Scale { get; }
+            public double Width { get; }
+            public double Height { get; }
+            public double MinimumX { get; }
+            public double MaximumX { get; }
+            public double DrawingTop => ToScreen(new Point2(0.0, _maximumY)).Y;
+            public double DrawingBottom => ToScreen(new Point2(0.0, _minimumY)).Y;
+            public double DrawingRight => ToScreen(new Point2(MaximumX, 0.0)).X;
 
             public Point ToScreen(Point2 point)
             {
-                double canvasCenterX = (CanvasLeft + CanvasRight) * 0.5;
-                double canvasCenterY = (CanvasTop + CanvasBottom) * 0.5;
                 return new Point(
-                    canvasCenterX + ((point.X - _worldCenterX) * Scale),
-                    canvasCenterY - ((point.Y - _worldCenterY) * Scale));
+                    _screenCenterX + ((point.X - _worldCenterX) * Scale),
+                    _screenCenterY - ((point.Y - _worldCenterY) * Scale));
+            }
+
+            public double ToWorldY(double screenY)
+            {
+                return _worldCenterY + ((_screenCenterY - screenY) / Scale);
             }
         }
 
-        private static Brush CreateBrush(byte red, byte green, byte blue)
+        private static Brush CreateBrush(byte red, byte green, byte blue, byte alpha = 255)
         {
-            var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+            var brush = new SolidColorBrush(Color.FromArgb(alpha, red, green, blue));
             brush.Freeze();
             return brush;
         }

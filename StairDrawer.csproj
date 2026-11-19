@@ -26,6 +26,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Patterns\M_BTCT.pat">
+      <Link>M_BTCT.pat</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Reference Include="AcCoreMgd">
       <HintPath>$(AutoCADManagedDir)\AcCoreMgd.dll</HintPath>
       <Private>false</Private>
@@ -38,6 +42,10 @@
       <HintPath>$(AutoCADManagedDir)\AcMgd.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="AdWindows">
+      <HintPath>$(AutoCADManagedDir)\AdWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="ValidateAutoCADReferences" BeforeTargets="ResolveAssemblyReferences"
@@ -46,12 +54,22 @@
   </Target>
 
   <Target Name="CreateBundle" AfterTargets="Build" Condition="'$(CreateAutoCADBundle)' == 'true'">
+    <GetAssemblyIdentity AssemblyFiles="$(AutoCADManagedDir)\AcMgd.dll">
+      <Output TaskParameter="Assemblies" ItemName="_AutoCADManagedAssembly" />
+    </GetAssemblyIdentity>
     <PropertyGroup>
       <BundleOutputDir Condition="'$(BundleOutputDir)' == ''">$(TargetDir)StairDrawer.bundle</BundleOutputDir>
+      <_AutoCADManagedVersion>@(_AutoCADManagedAssembly->'%(Version)')</_AutoCADManagedVersion>
+      <AutoCADSeries Condition="'$(AutoCADSeries)' == ''">R$([System.Version]::Parse('$(_AutoCADManagedVersion)').ToString(2))</AutoCADSeries>
     </PropertyGroup>
     <MakeDir Directories="$(BundleOutputDir)\Contents\Windows" />
     <Copy SourceFiles="$(ProjectDir)PackageContents.xml" DestinationFolder="$(BundleOutputDir)" />
+    <XmlPoke XmlInputPath="$(BundleOutputDir)\PackageContents.xml"
+             Query="/ApplicationPackage/Components/RuntimeRequirements/@SeriesMin" Value="$(AutoCADSeries)" />
+    <XmlPoke XmlInputPath="$(BundleOutputDir)\PackageContents.xml"
+             Query="/ApplicationPackage/Components/RuntimeRequirements/@SeriesMax" Value="$(AutoCADSeries)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BundleOutputDir)\Contents\Windows" />
+    <Copy SourceFiles="$(TargetDir)M_BTCT.pat" DestinationFolder="$(BundleOutputDir)\Contents\Windows" />
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb"
           DestinationFolder="$(BundleOutputDir)\Contents\Windows"
           Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
@@ -68,6 +86,9 @@
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(BundleOutputDir)\Contents\Windows\$(TargetName).dll"
           DestinationFiles="$(DeployedBundleDir)\Contents\Windows\$(TargetName).dll"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(BundleOutputDir)\Contents\Windows\M_BTCT.pat"
+          DestinationFiles="$(DeployedBundleDir)\Contents\Windows\M_BTCT.pat"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(BundleOutputDir)\Contents\Windows\$(TargetName).pdb"
           DestinationFiles="$(DeployedBundleDir)\Contents\Windows\$(TargetName).pdb"

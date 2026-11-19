@@ -17,6 +17,8 @@ namespace StairDrawer.Services
             new LayerDefinition(StairLayers.PlanVisible, 7, LineWeight.LineWeight030, "Continuous"),
             new LayerDefinition(StairLayers.PlanHidden, 8, LineWeight.LineWeight015, "HIDDEN"),
             new LayerDefinition(StairLayers.PlanCut, 1, LineWeight.LineWeight040, "Continuous"),
+            new LayerDefinition(StairLayers.SectionTrace, 4, LineWeight.LineWeight018, "CENTER"),
+            new LayerDefinition(StairLayers.SectionTraceMark, 4, LineWeight.LineWeight025, "Continuous"),
             new LayerDefinition(StairLayers.PlanAnnotation, 3, LineWeight.LineWeight030, "Continuous"),
             new LayerDefinition(StairLayers.PlanText, 7, LineWeight.LineWeight018, "Continuous"),
             new LayerDefinition(StairLayers.Concrete, 1, LineWeight.LineWeight035, "Continuous"),
@@ -27,6 +29,43 @@ namespace StairDrawer.Services
         };
 
         public int Draw(Database database, DrawingModel drawing, StairPlacement placement)
+        {
+            if (database == null) throw new ArgumentNullException(nameof(database));
+            return DrawInto(database, drawing, placement, database.CurrentSpaceId);
+        }
+
+        internal ObjectId DrawAsBlock(Database database, DrawingModel drawing, StairPlacement placement, StairSectionParameters parameters)
+        {
+            using (Transaction transaction = database.TransactionManager.StartTransaction())
+            {
+                var table = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForWrite);
+                var definition = new BlockTableRecord { Name = "STAIRDRAW_SECTION_" + Guid.NewGuid().ToString("N") };
+                table.Add(definition);
+                transaction.AddNewlyCreatedDBObject(definition, true);
+                DrawInto(database, drawing, new StairPlacement(Point3d.Origin, Vector3d.XAxis), definition.ObjectId);
+                var source = new BlockReference(placement.Origin, definition.ObjectId)
+                {
+                    Rotation = Math.Atan2(placement.XAxis.Y, placement.XAxis.X)
+                };
+                var space = (BlockTableRecord)transaction.GetObject(database.CurrentSpaceId, OpenMode.ForWrite);
+                AppendEntity(space, transaction, source);
+                source.CreateExtensionDictionary();
+                var dictionary = (DBDictionary)transaction.GetObject(source.ExtensionDictionary, OpenMode.ForWrite);
+                var record = new Xrecord();
+                using (var data = new ResultBuffer(new TypedValue((int)DxfCode.Int16, (short)1),
+                    new TypedValue((int)DxfCode.Real, parameters.TreadDepth),
+                    new TypedValue((int)DxfCode.Real, parameters.RiserHeight),
+                    new TypedValue((int)DxfCode.Real, parameters.FinishThickness),
+                    new TypedValue((int)DxfCode.Real, parameters.WaistSlabThickness))) record.Data = data;
+                dictionary.SetAt("STAIRDRAW_SECTION_V1", record);
+                transaction.AddNewlyCreatedDBObject(record, true);
+                ObjectId id = source.ObjectId;
+                transaction.Commit();
+                return id;
+            }
+        }
+
+        private int DrawInto(Database database, DrawingModel drawing, StairPlacement placement, ObjectId ownerId)
         {
             if (database == null)
             {
@@ -58,7 +97,7 @@ namespace StairDrawer.Services
             {
                 EnsureLayers(database, transaction);
                 var currentSpace = (BlockTableRecord)transaction.GetObject(
-                    database.CurrentSpaceId,
+                    ownerId,
                     OpenMode.ForWrite);
 
                 entityCount += AppendPolylines(
@@ -123,7 +162,7 @@ namespace StairDrawer.Services
                     currentSpace,
                     transaction);
 
-                double baseRotation = Math.Atan2(xAxis.Y, xAxis.X);
+                double baseRotation = transform.Rotation;
                 foreach (TextPrimitive primitive in drawing.Texts)
                 {
                     Point3d textPoint = transform.ToWorld(primitive.Position);
@@ -180,9 +219,49 @@ namespace StairDrawer.Services
                 Polyline polyline = CreatePolyline(primitive, transform, elevation);
                 AppendEntity(currentSpace, transaction, polyline);
                 appendedCount++;
+                if (primitive.Closed
+                    && (primitive.LayerName == StairLayers.Brick || primitive.LayerName == StairLayers.Concrete
+                        || primitive.LayerName == StairLayers.RailingGlass))
+                {
+                    AppendMaterialHatch(currentSpace, transaction, polyline, transform.Rotation);
+                    appendedCount++;
+                }
             }
 
             return appendedCount;
+        }
+
+        private static void AppendMaterialHatch(
+            BlockTableRecord currentSpace, Transaction transaction, Polyline boundary, double rotation)
+        {
+            using (var hatch = new Hatch())
+            {
+                hatch.SetDatabaseDefaults(currentSpace.Database);
+                hatch.LayerId = boundary.LayerId;
+                hatch.Normal = boundary.Normal;
+                hatch.Elevation = boundary.Elevation;
+                currentSpace.AppendEntity(hatch);
+                transaction.AddNewlyCreatedDBObject(hatch, true);
+
+                bool concrete = boundary.Layer == StairLayers.Concrete;
+                bool glass = boundary.Layer == StairLayers.RailingGlass;
+                string pattern = glass ? "AR-RROOF" : concrete ? "M_BTCT" : "ANSI31";
+                HatchPatternType type = concrete ? HatchPatternType.CustomDefined : HatchPatternType.PreDefined;
+                double unitScale = currentSpace.Database.Measurement == MeasurementValue.English ? 25.4 : 1.0;
+                hatch.SetHatchPattern(type, pattern);
+                hatch.PatternScale = glass || concrete ? 10.0 : 4.0 * unitScale;
+                hatch.PatternAngle = rotation < 0.0 ? rotation + (Math.PI * 2.0) : rotation;
+                if (glass)
+                {
+                    hatch.Color = Color.FromRgb(34, 211, 238);
+                    hatch.Transparency = new Transparency(64);
+                }
+                hatch.SetHatchPattern(hatch.PatternType, hatch.PatternName);
+                hatch.Associative = true;
+                var loop = new ObjectIdCollection { boundary.ObjectId };
+                hatch.AppendLoop(HatchLoopTypes.Outermost, loop);
+                hatch.EvaluateHatch(true);
+            }
         }
 
         private static int AppendWipeouts(
@@ -368,6 +447,8 @@ namespace StairDrawer.Services
                 _xAxis = xAxis;
                 _yAxis = yAxis;
             }
+
+            public double Rotation => Math.Atan2(_xAxis.Y, _xAxis.X);
 
             public Point3d ToWorld(Point2 point)
             {

@@ -26,7 +26,11 @@ namespace StairDrawer.Models
             double stairWidth,
             double landingDepth,
             double flightGap,
-            double planCutHeight)
+            double planCutHeight,
+            UTurnSteps turnSteps = default,
+            bool hasStraightLanding = false,
+            bool drawRailing = false,
+            StairCutSelection sectionCut = default)
         {
             StairParameterValidation.ValidatePlanType(planType);
 
@@ -44,7 +48,9 @@ namespace StairDrawer.Models
             StairParameterValidation.ValidateRiserDistribution(
                 planType,
                 totalRisers,
-                firstFlightRisers);
+                firstFlightRisers,
+                turnSteps,
+                hasStraightLanding);
 
             if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
@@ -84,6 +90,10 @@ namespace StairDrawer.Models
             LandingDepth = landingDepth;
             FlightGap = flightGap;
             PlanCutHeight = planCutHeight;
+            TurnSteps = turnSteps;
+            HasStraightLanding = hasStraightLanding;
+            DrawRailing = drawRailing;
+            SectionCut = sectionCut;
         }
 
         public StairPlanType PlanType { get; }
@@ -94,7 +104,7 @@ namespace StairDrawer.Models
 
         public int FirstFlightRisers { get; }
 
-        public int SecondFlightRisers => TotalRisers - FirstFlightRisers;
+        public int SecondFlightRisers => TotalRisers - FirstFlightRisers - (int)TurnSteps.TotalRisers;
 
         public double TreadDepth { get; }
 
@@ -105,6 +115,14 @@ namespace StairDrawer.Models
         public double FlightGap { get; }
 
         public double PlanCutHeight { get; }
+
+        public UTurnSteps TurnSteps { get; }
+
+        public bool HasStraightLanding { get; }
+
+        public bool DrawRailing { get; }
+
+        public StairCutSelection SectionCut { get; }
 
         public double RiserHeight => FloorHeight / TotalRisers;
     }
@@ -122,7 +140,13 @@ namespace StairDrawer.Models
             double finishThickness,
             bool drawRailing,
             StairRailingType railingType,
-            double railingHeight)
+            double railingHeight,
+            UTurnSteps turnSteps = default,
+            double planStairWidth = 0.0,
+            double planLandingDepth = 0.0,
+            bool hasStraightLanding = false,
+            double planFlightGap = 0.0,
+            StairCutSelection sectionCut = default)
         {
             StairParameterValidation.ValidatePlanType(planType);
 
@@ -140,7 +164,9 @@ namespace StairDrawer.Models
             StairParameterValidation.ValidateRiserDistribution(
                 planType,
                 totalRisers,
-                firstFlightRisers);
+                firstFlightRisers,
+                turnSteps,
+                hasStraightLanding);
 
             if (!NumericValidation.IsFinite(treadDepth) || treadDepth <= 0.0)
             {
@@ -175,6 +201,25 @@ namespace StairDrawer.Models
                 throw new ArgumentOutOfRangeException(nameof(railingHeight));
             }
 
+            if (planType != StairPlanType.Straight && planStairWidth == 0.0 && planLandingDepth == 0.0)
+            {
+                planStairWidth = landingLength;
+                planLandingDepth = landingLength;
+            }
+
+            if ((planType != StairPlanType.Straight || hasStraightLanding)
+                && (!NumericValidation.IsFinite(planStairWidth) || planStairWidth <= 0.0
+                    || !NumericValidation.IsFinite(planLandingDepth) || planLandingDepth <= 0.0
+                    || (!hasStraightLanding && planLandingDepth < planStairWidth)))
+            {
+                throw new ArgumentException("The plan dimensions must define a valid landing.", nameof(planStairWidth));
+            }
+
+            if (!NumericValidation.IsFinite(planFlightGap) || planFlightGap < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(planFlightGap));
+            }
+
             PlanType = planType;
             FloorHeight = floorHeight;
             TotalRisers = totalRisers;
@@ -186,6 +231,12 @@ namespace StairDrawer.Models
             DrawRailing = drawRailing;
             RailingType = railingType;
             RailingHeight = railingHeight;
+            TurnSteps = turnSteps;
+            PlanStairWidth = planStairWidth;
+            PlanLandingDepth = planLandingDepth;
+            HasStraightLanding = hasStraightLanding;
+            PlanFlightGap = planFlightGap;
+            SectionCut = sectionCut;
         }
 
         public StairPlanType PlanType { get; }
@@ -196,7 +247,7 @@ namespace StairDrawer.Models
 
         public int FirstFlightRisers { get; }
 
-        public int SecondFlightRisers => TotalRisers - FirstFlightRisers;
+        public int SecondFlightRisers => TotalRisers - FirstFlightRisers - (int)TurnSteps.TotalRisers;
 
         public double TreadDepth { get; }
 
@@ -211,6 +262,13 @@ namespace StairDrawer.Models
         public StairRailingType RailingType { get; }
 
         public double RailingHeight { get; }
+
+        public UTurnSteps TurnSteps { get; }
+        public double PlanStairWidth { get; }
+        public double PlanLandingDepth { get; }
+        public bool HasStraightLanding { get; }
+        public double PlanFlightGap { get; }
+        public StairCutSelection SectionCut { get; }
 
         public double RiserHeight => FloorHeight / TotalRisers;
     }
@@ -230,10 +288,22 @@ namespace StairDrawer.Models
         public static void ValidateRiserDistribution(
             StairPlanType planType,
             int totalRisers,
-            int firstFlightRisers)
+            int firstFlightRisers,
+            UTurnSteps turnSteps,
+            bool hasStraightLanding)
         {
-            int secondFlightRisers = totalRisers - firstFlightRisers;
-            if (planType == StairPlanType.Straight)
+            if (planType != StairPlanType.UShape && turnSteps.HasSteps)
+            {
+                throw new ArgumentException("Turn steps require a U-shaped stair.", nameof(turnSteps));
+            }
+
+            if (planType != StairPlanType.Straight && hasStraightLanding)
+            {
+                throw new ArgumentException("The straight landing option requires a straight stair.", nameof(hasStraightLanding));
+            }
+
+            long secondFlightRisers = (long)totalRisers - firstFlightRisers - turnSteps.TotalRisers;
+            if (planType == StairPlanType.Straight && !hasStraightLanding)
             {
                 if (firstFlightRisers != totalRisers)
                 {

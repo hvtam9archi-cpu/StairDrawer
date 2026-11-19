@@ -4,4 +4,4 @@ artifacts/
 .vs/
 *.user
 *.suo
-UI/StairConfigurationWindow.xaml.cs
+*.log

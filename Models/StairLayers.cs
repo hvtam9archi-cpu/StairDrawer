@@ -6,6 +6,8 @@ namespace StairDrawer.Models
         public const string SectionVisible = PlanVisible;
         public const string PlanHidden = "ABC_A_Khuat";
         public const string PlanCut = "ABC_A_Netcat";
+        public const string SectionTrace = "STAIR-SECTION-TRACE";
+        public const string SectionTraceMark = "STAIR-SECTION-MARK";
         public const string PlanAnnotation = "ABC_A_Anotation";
         public const string PlanText = "ABC_A_Text";
         public const string Concrete = "STAIR-CONCRETE";

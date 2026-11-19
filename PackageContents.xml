@@ -8,7 +8,7 @@
                     ProductCode="{9A15060B-EA31-43EF-9A22-E71755ECD084}">
   <CompanyDetails Name="StairDrawer" />
   <Components Description="StairDrawer commands">
-    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.0" SeriesMax="R24.0" />
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.0" SeriesMax="R24.0" SupportPath="./Contents/Windows" />
     <ComponentEntry AppName="StairDrawer"
                     Version="1.0.0"
                     ModuleName="./Contents/Windows/StairDrawer.dll"
