@@ -92,6 +92,12 @@ namespace StairDrawer.UI
             ? StairRailingType.Glass
             : StairRailingType.Iron;
 
+        private GlassRailingOptions SelectedGlassOptions => new GlassRailingOptions(
+            FramelessGlassRadioButton.IsChecked == true ? GlassRailingType.Frameless : GlassRailingType.WithPosts,
+            RecessedChannelRadioButton.IsChecked == true ? GlassMountType.RecessedChannel
+                : SinglePadRadioButton.IsChecked == true ? GlassMountType.SinglePad : GlassMountType.DoublePad,
+            ReadPreviewDouble(GlassThicknessTextBox, 12, 6, 40), ReadPreviewDouble(GlassPanelGapTextBox, 10, 5, 50));
+
         private bool HasStraightLanding => SelectedStairType == StairPlanType.Straight
             && StraightLandingCheckBox.IsChecked == true;
 
@@ -165,6 +171,17 @@ namespace StairDrawer.UI
             }
 
             StairCutSelection cut = plan?.SectionCut ?? section.SectionCut;
+            StairRailingType railing = plan?.RailingType ?? section.RailingType;
+            GlassRailingOptions glass = plan?.GlassOptions ?? section.GlassOptions;
+            IronRailingRadioButton.IsChecked = railing == StairRailingType.Iron;
+            GlassRailingRadioButton.IsChecked = railing == StairRailingType.Glass;
+            GlassWithPostsRadioButton.IsChecked = glass.HasPosts;
+            FramelessGlassRadioButton.IsChecked = !glass.HasPosts;
+            SinglePadRadioButton.IsChecked = glass.Mount == GlassMountType.SinglePad;
+            DoublePadRadioButton.IsChecked = glass.Mount == GlassMountType.DoublePad;
+            RecessedChannelRadioButton.IsChecked = glass.Mount == GlassMountType.RecessedChannel;
+            GlassThicknessTextBox.Text = glass.Thickness.ToString(CultureInfo.CurrentCulture);
+            GlassPanelGapTextBox.Text = glass.PanelGap.ToString(CultureInfo.CurrentCulture);
             _sectionCutPosition = cut.Position;
             ReverseSectionViewCheckBox.IsChecked = cut.ReverseView;
             _lastStairType = shape;
@@ -391,8 +408,10 @@ namespace StairDrawer.UI
             SecondFlightRisersLabel.Text = turnSteps.HasSteps ? "Số cổ bậc vế trên (B)" : "Số cổ bậc vế 2 (B)";
             SectionLandingLengthRow.Visibility = stairType == StairPlanType.LShape
                 ? Visibility.Collapsed : Visibility.Visible;
-            RailingOptionsPanel.IsEnabled = drawingMode == StairDrawingMode.Section
-                && DrawRailingCheckBox.IsChecked == true;
+            RailingOptionsPanel.IsEnabled = isPlan ? DrawPlanRailingCheckBox.IsChecked == true : DrawRailingCheckBox.IsChecked == true;
+            GlassOptionsPanel.Visibility = SelectedRailingType == StairRailingType.Glass ? Visibility.Visible : Visibility.Collapsed;
+            GlassMountOptionsPanel.Visibility = FramelessGlassRadioButton.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            RailingHeightRow.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
 
             TotalRisersTextBox.IsReadOnly = true;
             TotalRisersLabel.Text = "Tổng số cổ bậc (tự tính)";
@@ -508,7 +527,7 @@ namespace StairDrawer.UI
                     values.TurnSteps,
                     values.HasStraightLanding,
                     DrawPlanRailingCheckBox.IsChecked == true,
-                    SelectedSectionCut);
+                    SelectedSectionCut).WithRailingOptions(SelectedRailingType, SelectedGlassOptions);
                 cut = StairSectionCut.FromPlan(parameters);
                 drawing = StairPlanGeometry.Create(parameters);
             }
@@ -531,7 +550,7 @@ namespace StairDrawer.UI
                     values.PlanLandingDepth,
                     values.HasStraightLanding,
                     values.FlightGap,
-                    SelectedSectionCut);
+                    SelectedSectionCut).WithGlassOptions(SelectedGlassOptions);
                 cut = StairSectionCut.FromSection(parameters);
                 drawing = StairSectionGeometry.Create(parameters);
             }
@@ -1308,6 +1327,11 @@ namespace StairDrawer.UI
                 return false;
             }
 
+            if (SelectedRailingType == StairRailingType.Glass
+                && (isPlan ? DrawPlanRailingCheckBox.IsChecked == true : DrawRailingCheckBox.IsChecked == true)
+                && (!TryReadDouble(GlassThicknessTextBox, "Chiều dày kính", 6, 40, out double glassThickness)
+                    || !TryReadDouble(GlassPanelGapTextBox, "Khe giữa các tấm kính", 5, 50, out double glassGap))) return false;
+
             if (isPlan)
             {
                 if (!TryReadDouble(PlanCutHeightTextBox, "Cao độ mặt phẳng cắt", 100.0, floorHeight - 1.0, out double planCutHeight))
@@ -1328,7 +1352,7 @@ namespace StairDrawer.UI
                     turnSteps,
                     hasStraightLanding,
                     DrawPlanRailingCheckBox.IsChecked == true,
-                    SelectedSectionCut));
+                    SelectedSectionCut).WithRailingOptions(SelectedRailingType, SelectedGlassOptions));
             }
             else
             {
@@ -1371,7 +1395,7 @@ namespace StairDrawer.UI
                     landingDepth,
                     hasStraightLanding,
                     flightGap,
-                    SelectedSectionCut));
+                    SelectedSectionCut).WithGlassOptions(SelectedGlassOptions));
             }
 
             double riserHeight = floorHeight / totalRisers;

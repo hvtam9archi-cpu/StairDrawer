@@ -122,6 +122,17 @@ namespace StairDrawer.Models
 
         public bool DrawRailing { get; }
 
+        public StairRailingType RailingType { get; private set; } = StairRailingType.Iron;
+        public GlassRailingOptions GlassOptions { get; private set; } = GlassRailingOptions.Default;
+
+        public StairPlanParameters WithRailingOptions(StairRailingType type, GlassRailingOptions options)
+        {
+            if (type != StairRailingType.Iron && type != StairRailingType.Glass) throw new ArgumentOutOfRangeException(nameof(type));
+            var copy = (StairPlanParameters)MemberwiseClone();
+            copy.RailingType = type; copy.GlassOptions = options ?? throw new ArgumentNullException(nameof(options));
+            return copy;
+        }
+
         public StairCutSelection SectionCut { get; }
 
         public double RiserHeight => FloorHeight / TotalRisers;
@@ -260,6 +271,15 @@ namespace StairDrawer.Models
         public bool DrawRailing { get; }
 
         public StairRailingType RailingType { get; }
+
+        public GlassRailingOptions GlassOptions { get; private set; } = GlassRailingOptions.Default;
+
+        public StairSectionParameters WithGlassOptions(GlassRailingOptions options)
+        {
+            var copy = (StairSectionParameters)MemberwiseClone();
+            copy.GlassOptions = options ?? throw new ArgumentNullException(nameof(options));
+            return copy;
+        }
 
         public double RailingHeight { get; }
 

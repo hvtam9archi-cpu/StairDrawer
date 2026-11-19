@@ -4,7 +4,7 @@ using StairDrawer.Models;
 
 namespace StairDrawer.Geometry
 {
-    internal static class StairSectionGeometry
+    internal static partial class StairSectionGeometry
     {
         private const double NosingProjection = 20.0;
         private const double NosingChamfer = 5.0;
@@ -27,6 +27,13 @@ namespace StairDrawer.Geometry
         private const double PointTolerance = 1e-9;
 
         public static DrawingModel Create(StairSectionParameters parameters)
+        {
+            DrawingModel drawing = CreateCore(parameters);
+            NormalizeConnectedRailing(drawing);
+            return drawing;
+        }
+
+        private static DrawingModel CreateCore(StairSectionParameters parameters)
         {
             if (parameters == null)
             {
@@ -109,20 +116,7 @@ namespace StairDrawer.Geometry
                 return;
             }
 
-            if (flights.Count > 1)
-            {
-                AddFlightHandrail(drawing, parameters, flights);
-            }
-
-            for (int index = flights.Count - 1; index >= 0; index--)
-            {
-                AddRailing(drawing, parameters, flights[index], index == 0, index == flights.Count - 1, flights.Count > 1);
-            }
-
-            if (flights.Count > 1)
-            {
-                AddUTurnRailingPosts(drawing, parameters, flights);
-            }
+            AddConnectedGlassRailings(drawing, parameters, flights);
         }
 
         private static void AddIronSectionRailings(
@@ -161,6 +155,14 @@ namespace StairDrawer.Geometry
                     || flight.StartElevation > PointTolerance;
                 AddIronRailing(index == 0 ? near : far, parameters, flight,
                     GetRailingBasePoint(flight, parameters, 0), startsAtFloor, endsAtFloor);
+            }
+
+            if (parameters.PlanType == StairPlanType.LShape && flights.Count == 1 && !parameters.SectionCut.ReverseView)
+            {
+                double x = StairPlanGeometry.GetLFlightStartX(flights[0].EndX, parameters.PlanLandingDepth, parameters.PlanStairWidth)
+                    + GetSectionRailingInset(parameters);
+                AddMetalBox(near, x - 10, flights[0].LandingElevation + parameters.RiserHeight + parameters.FinishThickness,
+                    x + 10, parameters.FloorHeight + parameters.FinishThickness + parameters.RailingHeight - 25);
             }
 
             if (flights.Count > 1)
@@ -277,6 +279,7 @@ namespace StairDrawer.Geometry
 
             AddRetainedWinderLines(drawing, parameters, cut, turn, lower.EndX, lower.LandingElevation, false);
             AddRetainedWinderLines(drawing, parameters, cut, turn, lower.EndX, secondCornerBase, true);
+            if (parameters.DrawRailing) AddProjectedTurnConnection(drawing, parameters, lower, upper);
             return drawing;
         }
 
@@ -378,7 +381,14 @@ namespace StairDrawer.Geometry
                 double half = Math.Min(IronHandrailDiameter * 0.5, inset * 0.5);
                 foreach (double x in new[] { left + inset, right - inset })
                 {
-                    AddHorizontalSection(drawing, x - half, x + half, top + half, half * 2.0, StairLayers.Railing);
+                    if (parameters.RailingType == StairRailingType.Glass)
+                    {
+                        var metal = new DrawingModel();
+                        AddGlassTransverseEdge(drawing, metal, parameters, x, treadElevation + parameters.FinishThickness,
+                            Math.Max(top, startElevation + risers * parameters.RiserHeight + parameters.FinishThickness + parameters.RailingHeight), true);
+                        RailingOutlineGeometry.Append(drawing, new List<PolylinePrimitive>(metal.Polylines), true);
+                    }
+                    else AddHorizontalSection(drawing, x - half, x + half, top + half, half * 2.0, StairLayers.Railing);
                 }
             }
         }
@@ -630,17 +640,7 @@ namespace StairDrawer.Geometry
                 return;
             }
 
-            AddContinuousMemberOutline(drawing, handrail, IronHandrailDiameter);
-            for (int index = 0; index < pitchLine.Count; index++)
-            {
-                AddRailingPost(drawing, pitchLine[index], parameters.RailingHeight);
-                if (index > 0)
-                {
-                    AddGlassPanel(
-                        drawing, pitchLine[index - 1], pitchLine[index],
-                        parameters.RailingHeight - GlassHandrailClearance);
-                }
-            }
+            AddDevelopedGlassRailings(drawing, parameters, pitchLine);
         }
 
         private static IReadOnlyList<FlightLayout> CreateFlightLayouts(StairSectionParameters parameters)
@@ -908,6 +908,8 @@ namespace StairDrawer.Geometry
                 double railingTop = top + parameters.RailingHeight;
                 foreach (double railX in new[] { left + inset, right - inset })
                 {
+                    // The near edge is part of the continuous lower-flight/landing/upper-flight assembly.
+                    if (Math.Abs(railX - left - inset) < PointTolerance) continue;
                     if (parameters.RailingType == StairRailingType.Iron)
                     {
                         double halfWidth = IronHandrailDiameter * 0.5;
@@ -917,7 +919,9 @@ namespace StairDrawer.Geometry
                     }
                     else
                     {
-                        AddRailingPost(drawing, new Point2(railX, railingBottom), railingTop - railingBottom);
+                        var metal = new DrawingModel();
+                        AddGlassTransverseEdge(drawing, metal, parameters, railX, railingBottom, railingTop, true);
+                        RailingOutlineGeometry.Append(drawing, new List<PolylinePrimitive>(metal.Polylines), true);
                     }
                 }
             }
@@ -1124,39 +1128,6 @@ namespace StairDrawer.Geometry
             {
                 drawing.Polylines.Add(new PolylinePrimitive(visible, true, layer));
             }
-        }
-
-        private static void AddRailing(
-            DrawingModel drawing,
-            StairSectionParameters parameters,
-            FlightLayout flight,
-            bool includeStartPost,
-            bool includeEndPost,
-            bool hasTurnHandrail)
-        {
-            Point2 firstBase = GetRailingBasePoint(flight, parameters, 0);
-
-            if (parameters.RailingType == StairRailingType.Iron)
-            {
-                AddIronRailing(
-                    drawing,
-                    parameters,
-                    flight,
-                    firstBase,
-                    includeStartPost,
-                    includeEndPost);
-                return;
-            }
-
-            if (!hasTurnHandrail)
-            {
-                Point2 verticalOffset = new Point2(0.0, parameters.RailingHeight);
-                Point2 landingBase = GetRailingBasePoint(flight, parameters, flight.TreadCount);
-                AddContinuousMemberOutline(
-                    drawing, new[] { firstBase + verticalOffset, landingBase + verticalOffset }, IronHandrailDiameter);
-            }
-
-            AddGlassRailing(drawing, parameters, flight, includeStartPost, includeEndPost);
         }
 
         private static void AddIronRailing(
@@ -1443,7 +1414,7 @@ namespace StairDrawer.Geometry
                     first -= new Point2(flight.Direction * extension, slope * extension);
                 }
 
-                if (index == flights.Count - 1)
+                if (index == flights.Count - 1 && parameters.PlanType != StairPlanType.LShape)
                 {
                     double extension = IronTerminalPostWidth * 0.5;
                     landing += new Point2(flight.Direction * extension, slope * extension);
@@ -1457,6 +1428,14 @@ namespace StairDrawer.Geometry
                     AddVertexIfDistinct(centerline, new Point2(turnX, landing.Y));
                     AddVertexIfDistinct(centerline, new Point2(turnX, next.Y));
                 }
+            }
+
+            if (parameters.PlanType == StairPlanType.LShape && flights.Count == 1 && flights[0].StartElevation == 0 && !parameters.SectionCut.ReverseView)
+            {
+                double x = StairPlanGeometry.GetLFlightStartX(flights[0].EndX, parameters.PlanLandingDepth, parameters.PlanStairWidth)
+                    + GetSectionRailingInset(parameters);
+                AddVertexIfDistinct(centerline, new Point2(x, centerline[centerline.Count - 1].Y));
+                AddVertexIfDistinct(centerline, new Point2(x, parameters.FloorHeight + parameters.FinishThickness + parameters.RailingHeight));
             }
 
             AddContinuousMemberOutline(drawing, centerline, GetSectionHandrailWidth(parameters, flights), true);
@@ -1517,16 +1496,8 @@ namespace StairDrawer.Geometry
         private static void AddTurnPostInterval(
             DrawingModel drawing, StairSectionParameters parameters, double centerX, double bottom, double top)
         {
-            if (parameters.RailingType == StairRailingType.Iron)
-            {
-                double halfWidth = StairRailingDimensions.TurnPostWidth * 0.5;
-                AddIronBoxPost(
-                    drawing, centerX - halfWidth, bottom, centerX + halfWidth, bottom, top, top, true);
-            }
-            else
-            {
-                AddRailingPost(drawing, new Point2(centerX, bottom), top - bottom);
-            }
+            double halfWidth = StairRailingDimensions.TurnPostWidth * 0.5;
+            AddIronBoxPost(drawing, centerX - halfWidth, bottom, centerX + halfWidth, bottom, top, top, true);
         }
         private static void AddContinuousMemberOutline(
             DrawingModel drawing,
@@ -1659,91 +1630,6 @@ namespace StairDrawer.Geometry
             return flight.StartElevation
                 + ((treadIndex + 1) * parameters.RiserHeight)
                 + parameters.FinishThickness;
-        }
-
-        private static void AddGlassRailing(
-            DrawingModel drawing,
-            StairSectionParameters parameters,
-            FlightLayout flight,
-            bool includeStartPost,
-            bool includeEndPost)
-        {
-            double panelTopHeight = parameters.RailingHeight - GlassHandrailClearance;
-            double trim = Math.Min(IronHandrailDiameter + (IronMemberThickness * 0.5), parameters.TreadDepth * 0.25);
-            var trimOffset = new Point2(
-                flight.Direction * trim, parameters.RiserHeight * trim / parameters.TreadDepth);
-            int panelStartIndex = 0;
-            while (panelStartIndex < flight.TreadCount)
-            {
-                int panelEndIndex = Math.Min(
-                    flight.TreadCount,
-                    panelStartIndex + GlassPanelTreadSpan);
-                Point2 panelStartBase = GetRailingBasePoint(
-                    flight,
-                    parameters,
-                    panelStartIndex);
-                Point2 panelEndBase = GetRailingBasePoint(
-                    flight,
-                    parameters,
-                    panelEndIndex);
-                bool touchesTurnAtStart = panelStartIndex == 0 && !includeStartPost;
-                if (touchesTurnAtStart)
-                {
-                    panelStartBase += trimOffset;
-                }
-
-                if (panelEndIndex == flight.TreadCount && !includeEndPost)
-                {
-                    panelEndBase -= trimOffset;
-                }
-
-                AddGlassPanel(
-                    drawing,
-                    panelStartBase,
-                    panelEndBase,
-                    panelTopHeight);
-                if (!touchesTurnAtStart)
-                {
-                    AddRailingPost(drawing, panelStartBase, parameters.RailingHeight);
-                }
-                panelStartIndex = panelEndIndex;
-            }
-
-            if (includeEndPost)
-            {
-                Point2 landingBase = GetRailingBasePoint(flight, parameters, flight.TreadCount);
-                AddRailingPost(drawing, landingBase, parameters.RailingHeight);
-            }
-        }
-
-        private static void AddGlassPanel(
-            DrawingModel drawing,
-            Point2 startBase,
-            Point2 endBase,
-            double panelTopHeight)
-        {
-            Point2 bottomOffset = new Point2(0.0, GlassBottomGap);
-            Point2 topOffset = new Point2(0.0, panelTopHeight);
-            Point2 bottomStart = startBase + bottomOffset;
-            Point2 bottomEnd = endBase + bottomOffset;
-            Point2 topEnd = endBase + topOffset;
-            Point2 topStart = startBase + topOffset;
-            drawing.Polylines.Add(new PolylinePrimitive(
-                new[] { bottomStart, bottomEnd, topEnd, topStart },
-                true,
-                StairLayers.RailingGlass,
-                drawOnTop: true));
-        }
-
-        private static void AddRailingPost(
-            DrawingModel drawing,
-            Point2 postBase,
-            double railingHeight)
-        {
-            drawing.Lines.Add(new LinePrimitive(
-                postBase,
-                postBase + new Point2(0.0, railingHeight),
-                StairLayers.Railing));
         }
 
         private static Point2 GetRailingBasePoint(

@@ -267,6 +267,8 @@ namespace StairDrawer.Services
                 var record = (BlockTableRecord)tx.GetObject(block.BlockTableRecord, OpenMode.ForRead);
                 foreach (ObjectId id in record) CollectPieces(tx, (Entity)tx.GetObject(id, OpenMode.ForRead), matrix * block.BlockTransform, pieces, depth + 1);
             }
+            else if (entity is Circle circle)
+                pieces.Add(new Piece(CirclePoints(circle.Center, circle.Radius, 32).Select(p => p.TransformBy(matrix)).ToList(), true, circle.Layer));
             else if (entity is Line line)
                 pieces.Add(new Piece(new List<Point3d> { line.StartPoint.TransformBy(matrix), line.EndPoint.TransformBy(matrix) }, false, line.Layer));
         }

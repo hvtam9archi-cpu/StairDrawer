@@ -33,6 +33,27 @@ Ribbon dùng chung tab **TH Tools** với TPL (`TH_TOOLS_TAB`). StairDrawer tạ
 - Đầu bản thang bắt đầu tại chân thang, không thêm đoạn sàn ngang phía dưới.
 - Lan can sắt hoặc kính; tay vịn rộng 50 mm, trụ tại chiếu nghỉ/vế giữa rộng 20 mm.
 
+### Liên kết lan can kính
+
+Chọn **Lan can kính** rồi chọn cấu tạo trong cả chế độ mặt bằng và mặt cắt:
+
+| Cấu tạo | Liên kết được thể hiện |
+| --- | --- |
+| **Kính có trụ** | Trụ có chiều dày, bản mã chân trụ, bu lông neo xuống bậc/kết cấu, kẹp giữ mép kính và đầu trụ tiếp giáp tay vịn. |
+| **Kính không trụ – Pad đơn** | Pad tại các vị trí đỡ tấm kính; kính kéo xuống vùng liên kết với bản thang; kẹp và giá đỡ nối kính với tay vịn. |
+| **Kính không trụ – Pad đôi** | Hai pad theo chiều cao tại mỗi vị trí đỡ, cùng liên kết kính–tay vịn. |
+| **Kính không trụ – Sập âm sàn** | Profile chân kính âm trong vùng kết cấu, neo giữ profile, kính ngàm vào profile và giá đỡ tay vịn. |
+
+Có thể nhập **chiều dày kính 6–40 mm** và **khe giữa tấm 5–50 mm**; mặc định 12 và 10 mm. Mặt bằng ghi nhận cùng lựa chọn cấu tạo. Tay vịn kính và sắt nối qua chiếu nghỉ, vế giữa chữ U và chỗ quay chữ L; xử lý đường bao kim loại để giảm nét chồng tại mối nối.
+
+Các chi tiết liên kết là hình học minh họa cấu tạo; kích thước pad, bản mã, profile và neo cần chốt theo hệ phụ kiện và thiết kế kết cấu thực tế. Tham khảo kiểu liên kết: [pad điểm của SADEV](https://www.sadev.com/products/glass-balustrades/glass-railing-post/slab-nose-points/000110/), [giá tay vịn kẹp kính](https://www.sadev.com/products/glass-balustrades/handrails/on-support/glass-clamped-handrail/).
+
+![Lan can kính có trụ](docs/images/glass-with-posts.png)
+
+![Lan can kính không trụ dùng pad đôi](docs/images/glass-double-pad.png)
+
+![Lan can kính không trụ dùng sập âm sàn](docs/images/glass-recessed-channel.png)
+
 Các kích thước mặc định chính: **chiều cao tầng 3600 mm**, **chiều rộng mặt bậc 250 mm**. Thông số được nhập theo đơn vị bản vẽ; các giá trị mặc định và preview được thiết kế cho bản vẽ milimét. Hình học nằm trên WCS XY tại cao độ Z của điểm chèn.
 
 ### Cấu tạo và hatch
@@ -155,6 +176,14 @@ Chọn **Debug | x64**, nhấn **F5**. Build sinh `start.scr` để nạp DLL De
 
 ## Cấu trúc mã nguồn
 
+Chạy kiểm tra hình học không cần mở AutoCAD:
+
+```powershell
+dotnet run --project .\tests\StairDrawer.GeometryChecks\StairDrawer.GeometryChecks.csproj -c Release
+```
+
+Bộ kiểm tra gồm 144 trường hợp kính trong mặt bằng/mặt cắt, nối tay vịn U/L, neo không bám nhầm sang vế khác, số pad đơn/đôi và việc giữ nguyên cấu hình nguồn.
+
 - `Commands/`: lệnh `STAIRDRAW`, `STAIRDETAIL` và luồng tương tác.
 - `Initialization/`: khởi tạo plugin, ribbon TH Tools và icon vector.
 - `Models/`: thông số thang, vết cắt, bậc chuyển hướng và hình học trung gian.
@@ -164,5 +193,6 @@ Chọn **Debug | x64**, nhấn **F5**. Build sinh `start.scr` để nạp DLL De
 - `UI/`: cửa sổ cấu hình, preview và cửa sổ trích chi tiết.
 - `Patterns/`: hatch `M_BTCT.pat` được đóng kèm.
 - `docs/images/`: hình minh họa và icon cho README.
+- `tests/`: kiểm tra hình học chạy độc lập, không được biên dịch vào DLL plugin.
 
 Mặt cắt phục vụ triển khai bản vẽ cấu tạo; kích thước bản thang và cấu tạo chịu lực cần được kiểm tra theo thiết kế kết cấu của công trình.

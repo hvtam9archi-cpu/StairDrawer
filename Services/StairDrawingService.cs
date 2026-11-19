@@ -123,20 +123,6 @@ namespace StairDrawer.Services
                     entityCount++;
                 }
 
-                foreach (CirclePrimitive primitive in drawing.Circles)
-                {
-                    var circle = new Circle(
-                        transform.ToWorld(primitive.Center),
-                        Vector3d.ZAxis,
-                        primitive.Radius)
-                    {
-                        Layer = primitive.LayerName
-                    };
-
-                    AppendEntity(currentSpace, transaction, circle);
-                    entityCount++;
-                }
-
                 entityCount += AppendPolylines(
                     drawing.Polylines,
                     true,
@@ -163,6 +149,14 @@ namespace StairDrawer.Services
                     transaction);
 
                 double baseRotation = transform.Rotation;
+                // Fastener heads stay visible above glass hatches and opaque metal masks, as in the preview.
+                foreach (CirclePrimitive primitive in drawing.Circles)
+                {
+                    var circle = new Circle(transform.ToWorld(primitive.Center), Vector3d.ZAxis, primitive.Radius)
+                    { Layer = primitive.LayerName };
+                    AppendEntity(currentSpace, transaction, circle);
+                    entityCount++;
+                }
                 foreach (TextPrimitive primitive in drawing.Texts)
                 {
                     Point3d textPoint = transform.ToWorld(primitive.Position);

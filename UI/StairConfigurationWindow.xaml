@@ -420,6 +420,7 @@
                                           Style="{StaticResource DarkCheckBox}"
                                           Checked="OnOptionChanged"
                                           Unchecked="OnOptionChanged" />
+                            </StackPanel>
                                 <StackPanel x:Name="RailingOptionsPanel" IsEnabled="False">
                                     <UniformGrid Columns="2" Margin="0,0,0,8">
                                         <RadioButton x:Name="IronRailingRadioButton"
@@ -434,13 +435,33 @@
                                                      Style="{StaticResource ChoiceRadioButton}"
                                                      Checked="OnOptionChanged" />
                                     </UniformGrid>
-                                    <Grid Margin="0,0,0,8">
+                                    <StackPanel x:Name="GlassOptionsPanel" Visibility="Collapsed">
+                                        <UniformGrid Columns="2" Margin="0,0,0,8">
+                                            <RadioButton x:Name="GlassWithPostsRadioButton" GroupName="GlassConstruction" Content="Kính có trụ" IsChecked="True" Style="{StaticResource ChoiceRadioButton}" Checked="OnOptionChanged" />
+                                            <RadioButton x:Name="FramelessGlassRadioButton" GroupName="GlassConstruction" Content="Kính không trụ" Style="{StaticResource ChoiceRadioButton}" Checked="OnOptionChanged" />
+                                        </UniformGrid>
+                                        <UniformGrid x:Name="GlassMountOptionsPanel" Columns="3" Margin="0,0,0,8" Visibility="Collapsed">
+                                            <RadioButton x:Name="SinglePadRadioButton" GroupName="GlassMount" Content="Pad đơn" Style="{StaticResource ChoiceRadioButton}" Checked="OnOptionChanged" />
+                                            <RadioButton x:Name="DoublePadRadioButton" GroupName="GlassMount" Content="Pad đôi" IsChecked="True" Style="{StaticResource ChoiceRadioButton}" Checked="OnOptionChanged" />
+                                            <RadioButton x:Name="RecessedChannelRadioButton" GroupName="GlassMount" Content="Sập âm sàn" Style="{StaticResource ChoiceRadioButton}" Checked="OnOptionChanged" />
+                                        </UniformGrid>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
+                                            <TextBlock Text="Chiều dày kính" Style="{StaticResource FieldLabelStyle}" />
+                                            <TextBox x:Name="GlassThicknessTextBox" Grid.Column="1" Text="12" Style="{StaticResource DarkTextBox}" ToolTip="6–40 mm" TextChanged="OnParameterTextChanged" />
+                                        </Grid>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
+                                            <TextBlock Text="Khe giữa các tấm kính" Style="{StaticResource FieldLabelStyle}" />
+                                            <TextBox x:Name="GlassPanelGapTextBox" Grid.Column="1" Text="10" Style="{StaticResource DarkTextBox}" ToolTip="5–50 mm" TextChanged="OnParameterTextChanged" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <Grid x:Name="RailingHeightRow" Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions>
                                         <TextBlock Text="Chiều cao lan can (G)" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="RailingHeightTextBox" Grid.Column="1" Text="900" Style="{StaticResource DarkTextBox}" ToolTip="600–1500 mm" TextChanged="OnParameterTextChanged" />
                                     </Grid>
                                 </StackPanel>
-                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
