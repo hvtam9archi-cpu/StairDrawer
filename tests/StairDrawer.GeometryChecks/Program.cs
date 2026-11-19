@@ -5,7 +5,13 @@ using StairDrawer.Models;
 
 internal static class Program
 {
-    private static void Main()
+    private static int Main()
+    {
+        try { Run(); return 0; }
+        catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+    }
+
+    private static void Run()
     {
         var options = new[] { new GlassRailingOptions(),
             new GlassRailingOptions(GlassRailingType.Frameless, GlassMountType.SinglePad),
@@ -25,8 +31,9 @@ internal static class Program
             DrawingModel model = StairSectionGeometry.Create(p);
             string context = type + "/" + turn.TotalRisers + "/" + cut + "/" + reverse + "/" + glass.Type + "/" + glass.Mount;
             Require(!model.Lines.Any(a => a.LayerName == StairLayers.RailingGlass), "Obsolete glass diagonal: " + context);
-            Require(model.Lines.Where(a => a.LayerName == StairLayers.Railing).All(a => (a.End - a.Start).Length <= p.RiserHeight + p.WaistSlabThickness + p.FinishThickness + 80),
-                "A fixing crosses the gap into another flight: " + context);
+            Require(!model.Lines.Any(a => a.LayerName == StairLayers.Railing), "Embedded screw/anchor shafts remain: " + context);
+            if (!glass.HasPosts && type == StairPlanType.Straight)
+                Require(!model.Circles.Any(a => a.LayerName == StairLayers.Railing), "Frameless fittings appear on a cut straight flight: " + context);
             foreach (PolylinePrimitive polyline in model.Polylines)
             {
                 Require(polyline.Vertices.All(a => NumericValidation.IsFinite(a.X) && NumericValidation.IsFinite(a.Y)), "Non-finite geometry: " + context);
@@ -40,8 +47,15 @@ internal static class Program
             var plan = new StairPlanParameters(type, 3600, p.TotalRisers, first, 250, 1000, 1400, 100, 1200,
                 turn, landing, true, p.SectionCut).WithRailingOptions(StairRailingType.Glass, glass);
             DrawingModel planModel = StairPlanGeometry.Create(plan);
-            Require(planModel.Polylines.Any(a => a.LayerName == StairLayers.RailingGlass), "No glass in plan: " + context);
-            Require(plan.GlassOptions == p.GlassOptions, "Plan/section construction differs");
+            var standardPlan = StairPlanGeometry.Create(new StairPlanParameters(type, 3600, p.TotalRisers, first, 250, 1000, 1400, 100, 1200,
+                turn, landing, true, p.SectionCut));
+            Require(!planModel.Polylines.Any(a => a.LayerName == StairLayers.RailingGlass)
+                && !planModel.Circles.Any(a => a.LayerName == StairLayers.Railing), "Subdivided glass or fittings remain in plan: " + context);
+            var rails = planModel.Polylines.Where(a => a.LayerName == StairLayers.Railing).ToArray();
+            var standardRails = standardPlan.Polylines.Where(a => a.LayerName == StairLayers.Railing).ToArray();
+            Require(rails.Length == standardRails.Length && rails.Zip(standardRails, (a, b) => a.Closed == b.Closed
+                && a.Vertices.Count == b.Vertices.Count && a.Vertices.Zip(b.Vertices, (x, y) => (x - y).Length < 1e-8).All(x => x)).All(x => x),
+                "Plan rail geometry depends on the section construction: " + context);
             count++;
         }
         foreach (StairRailingType rail in Enum.GetValues(typeof(StairRailingType)))
@@ -55,12 +69,27 @@ internal static class Program
                 Require(InMetal(model, new Point2(2525, 2720 + 1800 * t)), "L upper rail is disconnected: " + rail);
             }
         }
-        var original = new StairSectionParameters(StairPlanType.Straight, 3600, 20, 20, 250, 1000, 120, 20, true, StairRailingType.Glass, 900);
+        var original = new StairSectionParameters(StairPlanType.UShape, 3600, 20, 10, 250, 1000, 120, 20, true, StairRailingType.Glass, 900);
         DrawingModel single = StairSectionGeometry.Create(original.WithGlassOptions(options[1]));
         DrawingModel dual = StairSectionGeometry.Create(original.WithGlassOptions(options[2]));
-        Require(dual.Circles.Count(a => a.Radius > 8) == 2 * single.Circles.Count(a => a.Radius > 8), "Double-pad hardware is not doubled");
+        Require(single.Circles.Any(a => a.Radius > 8) && dual.Circles.Count(a => a.Radius > 8) == 2 * single.Circles.Count(a => a.Radius > 8), "Visible double-pad hardware is not doubled");
+        foreach (GlassRailingOptions glass in options.Where(a => !a.HasPosts))
+        {
+            var forward = original.WithGlassOptions(glass);
+            var visibleUpper = StairSectionGeometry.Create(forward);
+            Require(visibleUpper.Circles.Where(a => a.LayerName == StairLayers.Railing).All(a => a.Center.Y > 1800), "Fittings appear on the cut lower flight");
+            var lowerOnly = new StairSectionParameters(StairPlanType.UShape, 3600, 20, 10, 250, 1000, 120, 20, true, StairRailingType.Glass, 900,
+                default, 1000, 1000, false, 100, new StairCutSelection(.12, true)).WithGlassOptions(glass);
+            Require(!StairSectionGeometry.Create(lowerOnly).Circles.Any(a => a.LayerName == StairLayers.Railing), "Cut-only reverse view contains frameless fixings");
+            var upperCut = new StairSectionParameters(StairPlanType.UShape, 3600, 20, 10, 250, 1000, 120, 20, true, StairRailingType.Glass, 900,
+                default, 1000, 1000, false, 100, new StairCutSelection(.84, true)).WithGlassOptions(glass);
+            var visibleLower = StairSectionGeometry.Create(upperCut);
+            Require(visibleLower.Circles.Where(a => a.LayerName == StairLayers.Railing && a.Radius > 8).All(a => a.Center.Y < 1800), "Pad fittings appear on the cut upper flight");
+            if (glass.Mount != GlassMountType.RecessedChannel)
+                Require(visibleLower.Circles.Any(a => a.Radius > 8), "Fixings were removed from the visible lower flight");
+        }
         Require(original.GlassOptions.HasPosts, "Changing glass options mutated an existing configuration");
-        Console.WriteLine("PASS: " + count + " glass plan/section cases; U/L joins, local anchors, pad multiplicity and immutable configurations.");
+        Console.WriteLine("PASS: " + count + " cases; uniform plan rails, no buried anchors, visible-only frameless fittings, U/L joins and immutable configurations.");
     }
 
     private static void CheckUJoin(DrawingModel model, StairSectionParameters p)

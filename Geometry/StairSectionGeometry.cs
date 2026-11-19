@@ -108,7 +108,7 @@ namespace StairDrawer.Geometry
         }
 
         private static void AddSectionFlightRailings(
-            DrawingModel drawing, StairSectionParameters parameters, IReadOnlyList<FlightLayout> flights)
+            DrawingModel drawing, StairSectionParameters parameters, IReadOnlyList<FlightLayout> flights, bool firstFlightCut = true)
         {
             if (parameters.RailingType == StairRailingType.Iron)
             {
@@ -116,7 +116,7 @@ namespace StairDrawer.Geometry
                 return;
             }
 
-            AddConnectedGlassRailings(drawing, parameters, flights);
+            AddConnectedGlassRailings(drawing, parameters, flights, firstFlightCut);
         }
 
         private static void AddIronSectionRailings(
@@ -208,6 +208,9 @@ namespace StairDrawer.Geometry
             {
                 target.Lines.Add(new LinePrimitive(Reflect(line.Start), Reflect(line.End), line.LayerName, line.LinetypeScale));
             }
+
+            foreach (CirclePrimitive circle in source.Circles)
+                target.Circles.Add(new CirclePrimitive(Reflect(circle.Center), circle.Radius, circle.LayerName));
 
             foreach (PolylinePrimitive polyline in source.Polylines)
             {
@@ -330,7 +333,7 @@ namespace StairDrawer.Geometry
             AddVisibleFinishes(drawing, parameters, flight);
             if (parameters.DrawRailing)
             {
-                AddSectionFlightRailings(drawing, parameters, new[] { flight });
+                AddSectionFlightRailings(drawing, parameters, new[] { flight }, false);
             }
         }
 
@@ -385,7 +388,7 @@ namespace StairDrawer.Geometry
                     {
                         var metal = new DrawingModel();
                         AddGlassTransverseEdge(drawing, metal, parameters, x, treadElevation + parameters.FinishThickness,
-                            Math.Max(top, startElevation + risers * parameters.RiserHeight + parameters.FinishThickness + parameters.RailingHeight), true);
+                            Math.Max(top, startElevation + risers * parameters.RiserHeight + parameters.FinishThickness + parameters.RailingHeight), true, false);
                         RailingOutlineGeometry.Append(drawing, new List<PolylinePrimitive>(metal.Polylines), true);
                     }
                     else AddHorizontalSection(drawing, x - half, x + half, top + half, half * 2.0, StairLayers.Railing);

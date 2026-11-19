@@ -132,8 +132,8 @@ namespace StairDrawer.Geometry
             {
                 double inset = StairRailingDimensions.GetInset(parameters.StairWidth);
                 double farSide = parameters.StairWidth - inset;
-                AddRailingPath(drawing, parameters, inset, new Point2(0.0, inset), new Point2(run, inset));
-                AddRailingPath(drawing, parameters, inset, new Point2(0.0, farSide), new Point2(run, farSide));
+                AddRailingPath(drawing, inset, new Point2(0.0, inset), new Point2(run, inset));
+                AddRailingPath(drawing, inset, new Point2(0.0, farSide), new Point2(run, farSide));
             }
         }
 
@@ -206,10 +206,10 @@ namespace StairDrawer.Geometry
                 double upperLeft = secondFlightStart.X + inset;
                 double upperRight = secondFlightStart.X + parameters.StairWidth - inset;
                 double endY = secondFlightStart.Y + secondRun;
-                AddRailingPath(drawing, parameters, inset,
+                AddRailingPath(drawing, inset,
                     new Point2(0.0, inset), new Point2(landingRight, inset),
                     new Point2(landingRight, insideY), new Point2(upperRight, insideY), new Point2(upperRight, endY));
-                AddRailingPath(drawing, parameters, inset,
+                AddRailingPath(drawing, inset,
                     new Point2(0.0, insideY), new Point2(upperLeft, insideY), new Point2(upperLeft, endY));
             }
         }
@@ -308,16 +308,16 @@ namespace StairDrawer.Geometry
                 double upperInnerY = secondFlightStart.Y + inset;
                 double upperOuterY = totalWidth - inset;
                 double endX = maximumRun - secondRun;
-                AddRailingPath(drawing, parameters, inset,
+                AddRailingPath(drawing, inset,
                     new Point2(firstFlightStart.X, inset), new Point2(outerX, inset),
                     new Point2(outerX, upperOuterY), new Point2(endX, upperOuterY));
-                AddRailingPath(drawing, parameters, inset,
+                AddRailingPath(drawing, inset,
                     new Point2(firstFlightStart.X, lowerInnerY), new Point2(innerX, lowerInnerY),
                     new Point2(innerX, upperInnerY), new Point2(endX, upperInnerY));
             }
         }
 
-        private static void AddRailingPath(DrawingModel drawing, StairPlanParameters parameters, double inset, params Point2[] points)
+        private static void AddRailingPath(DrawingModel drawing, double inset, params Point2[] points)
         {
             var centerline = new List<Point2>(points.Length);
             foreach (Point2 point in points)
@@ -346,7 +346,6 @@ namespace StairDrawer.Geometry
 
             drawing.Polylines.Add(new PolylinePrimitive(
                 outline, true, StairLayers.Railing, drawOnTop: true));
-            StairPlanRailingGeometry.AppendFixings(drawing, parameters, centerline);
         }
 
         private static void AddUSteppedTurn(

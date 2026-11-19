@@ -23,6 +23,7 @@ Ribbon dùng chung tab **TH Tools** với TPL (`TH_TOOLS_TAB`). StairDrawer tạ
 - Thang chữ U có thể thêm vế giữa hai chiếu nghỉ và chia từng chiếu thành các bậc chéo theo số lượng nhập.
 - Số bậc lẻ đặt vào từng bậc, tính cả bậc vế giữa và bậc chéo.
 - Tùy chọn vẽ lan can; tay vịn có hai mép và hai đầu, bề rộng 50 mm, cạnh gần cách mép bậc 50 mm.
+- Lan can mặt bằng thể hiện bằng đường bao liên tục như lan can sắt; không chia tấm kính, không vẽ phụ kiện và không có lựa chọn mẫu lan can ở chế độ mặt bằng.
 - Preview có dim kích thước và vết cắt A–A. Kéo vết cắt trong preview hoặc đảo hướng nhìn để cập nhật mặt cắt tương ứng.
 
 ### Mặt cắt
@@ -35,16 +36,18 @@ Ribbon dùng chung tab **TH Tools** với TPL (`TH_TOOLS_TAB`). StairDrawer tạ
 
 ### Liên kết lan can kính
 
-Chọn **Lan can kính** rồi chọn cấu tạo trong cả chế độ mặt bằng và mặt cắt:
+Trong chế độ **Mặt cắt**, chọn **Lan can kính** rồi chọn cấu tạo:
 
 | Cấu tạo | Liên kết được thể hiện |
 | --- | --- |
-| **Kính có trụ** | Trụ có chiều dày, bản mã chân trụ, bu lông neo xuống bậc/kết cấu, kẹp giữ mép kính và đầu trụ tiếp giáp tay vịn. |
+| **Kính có trụ** | Trụ có chiều dày, bản mã chân trụ, kẹp giữ mép kính và đầu trụ tiếp giáp tay vịn. |
 | **Kính không trụ – Pad đơn** | Pad tại các vị trí đỡ tấm kính; kính kéo xuống vùng liên kết với bản thang; kẹp và giá đỡ nối kính với tay vịn. |
 | **Kính không trụ – Pad đôi** | Hai pad theo chiều cao tại mỗi vị trí đỡ, cùng liên kết kính–tay vịn. |
-| **Kính không trụ – Sập âm sàn** | Profile chân kính âm trong vùng kết cấu, neo giữ profile, kính ngàm vào profile và giá đỡ tay vịn. |
+| **Kính không trụ – Sập âm sàn** | Profile chân kính, kính ngàm vào profile và giá đỡ tay vịn tại phần nhìn thấy. |
 
-Có thể nhập **chiều dày kính 6–40 mm** và **khe giữa tấm 5–50 mm**; mặc định 12 và 10 mm. Mặt bằng ghi nhận cùng lựa chọn cấu tạo. Tay vịn kính và sắt nối qua chiếu nghỉ, vế giữa chữ U và chỗ quay chữ L; xử lý đường bao kim loại để giảm nét chồng tại mối nối.
+Có thể nhập **chiều dày kính 6–40 mm** và **khe giữa tấm 5–50 mm**; mặc định 12 và 10 mm. Các lựa chọn cấu tạo chỉ áp dụng cho mặt cắt; mặt bằng luôn dùng đường bao lan can liên tục. Tay vịn kính và sắt nối qua chiếu nghỉ, vế giữa chữ U và chỗ quay chữ L; xử lý đường bao kim loại để giảm nét chồng tại mối nối.
+
+Không vẽ nét thân vít, bu lông hoặc đầu neo chìm trong mặt bậc. Với kính không trụ, pad, profile và giá đỡ chỉ thể hiện ở phần nhìn thấy; không thể hiện các liên kết này ở vế/chiếu bị cắt qua. Quy tắc này cập nhật theo vị trí A–A và hướng nhìn; pad nhìn thấy vẫn được giữ khi lật mặt cắt.
 
 Các chi tiết liên kết là hình học minh họa cấu tạo; kích thước pad, bản mã, profile và neo cần chốt theo hệ phụ kiện và thiết kế kết cấu thực tế. Tham khảo kiểu liên kết: [pad điểm của SADEV](https://www.sadev.com/products/glass-balustrades/glass-railing-post/slab-nose-points/000110/), [giá tay vịn kẹp kính](https://www.sadev.com/products/glass-balustrades/handrails/on-support/glass-clamped-handrail/).
 
@@ -182,7 +185,7 @@ Chạy kiểm tra hình học không cần mở AutoCAD:
 dotnet run --project .\tests\StairDrawer.GeometryChecks\StairDrawer.GeometryChecks.csproj -c Release
 ```
 
-Bộ kiểm tra gồm 144 trường hợp kính trong mặt bằng/mặt cắt, nối tay vịn U/L, neo không bám nhầm sang vế khác, số pad đơn/đôi và việc giữ nguyên cấu hình nguồn.
+Bộ kiểm tra gồm 144 trường hợp mặt bằng/mặt cắt, đường bao lan can mặt bằng đồng nhất, bỏ neo chìm, ẩn/hiện liên kết theo phần cắt/phần thấy, nối tay vịn U/L, số pad đơn/đôi và việc giữ nguyên cấu hình nguồn.
 
 - `Commands/`: lệnh `STAIRDRAW`, `STAIRDETAIL` và luồng tương tác.
 - `Initialization/`: khởi tạo plugin, ribbon TH Tools và icon vector.

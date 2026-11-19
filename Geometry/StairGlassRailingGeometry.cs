@@ -7,18 +7,20 @@ namespace StairDrawer.Geometry
 {
     internal static partial class StairSectionGeometry
     {
-        private static void AddConnectedGlassRailings(DrawingModel drawing, StairSectionParameters p, IReadOnlyList<FlightLayout> flights)
+        private static void AddConnectedGlassRailings(DrawingModel drawing, StairSectionParameters p, IReadOnlyList<FlightLayout> flights, bool firstFlightCut)
         {
             var metal = new DrawingModel();
             AddFlightHandrail(metal, p, flights);
-            foreach (FlightLayout flight in flights)
+            for (int flightIndex = 0; flightIndex < flights.Count; flightIndex++)
             {
+                FlightLayout flight = flights[flightIndex];
+                bool showFixings = !firstFlightCut || flightIndex > 0;
                 var posts = new List<Point2>();
                 for (int first = 0; first < flight.TreadCount; first += GlassPanelTreadSpan)
                 {
                     int last = Math.Min(flight.TreadCount, first + GlassPanelTreadSpan);
                     Point2 start = GetRailingBasePoint(flight, p, first), end = GetRailingBasePoint(flight, p, last);
-                    AddDetailedGlassBay(drawing, metal, p, start, end);
+                    AddDetailedGlassBay(drawing, metal, p, start, end, showFixings);
                     if (p.GlassOptions.HasPosts)
                     {
                         if (posts.Count == 0) posts.Add(start);
@@ -31,7 +33,7 @@ namespace StairDrawer.Geometry
                             ? StairRailingDimensions.TerminalPostWidth : StairRailingDimensions.TurnPostWidth);
             }
             if (flights.Count > 1)
-                AddGlassTurnFixings(drawing, metal, p, flights[0], flights[1]);
+                AddGlassTurnFixings(drawing, metal, p, flights[0], flights[1], false);
             if (p.PlanType == StairPlanType.LShape && flights.Count == 1 && flights[0].StartElevation == 0 && !p.SectionCut.ReverseView)
             {
                 double x = StairPlanGeometry.GetLFlightStartX(flights[0].EndX, p.PlanLandingDepth, p.PlanStairWidth)
@@ -55,7 +57,7 @@ namespace StairDrawer.Geometry
                 if (++count >= GlassPanelTreadSpan || corner || i == pitchLine.Count - 1)
                 { breaks.Add(pitchLine[i]); count = 0; }
             }
-            for (int i = 1; i < breaks.Count; i++) AddDetailedGlassBay(drawing, metal, p, breaks[i - 1], breaks[i]);
+            for (int i = 1; i < breaks.Count; i++) AddDetailedGlassBay(drawing, metal, p, breaks[i - 1], breaks[i], false);
             if (p.GlassOptions.HasPosts)
                 for (int i = 0; i < breaks.Count; i++)
                 {
@@ -66,7 +68,7 @@ namespace StairDrawer.Geometry
             RailingOutlineGeometry.Append(drawing, metal.Polylines.ToArray(), true);
         }
 
-        private static void AddDetailedGlassBay(DrawingModel drawing, DrawingModel metal, StairSectionParameters p, Point2 start, Point2 end)
+        private static void AddDetailedGlassBay(DrawingModel drawing, DrawingModel metal, StairSectionParameters p, Point2 start, Point2 end, bool showFixings)
         {
             double length = Math.Abs(end.X - start.X);
             if (length < 40) return;
@@ -90,7 +92,7 @@ namespace StairDrawer.Geometry
                 double recess = Math.Min(80, p.WaistSlabThickness * 0.55);
                 bottomA = new Point2(a.X, channel ? bandA.Item2 - recess * 0.55 : bandA.Item1 + 8);
                 bottomB = new Point2(b.X, channel ? bandB.Item2 - recess * 0.55 : bandB.Item1 + 8);
-                if (channel)
+                if (channel && showFixings)
                 {
                     AddMetal(metal, new[] { new Point2(a.X, bandA.Item2 - recess), new Point2(b.X, bandB.Item2 - recess),
                         new Point2(b.X, bandB.Item2 + 8), new Point2(a.X, bandA.Item2 + 8) });
@@ -105,19 +107,14 @@ namespace StairDrawer.Geometry
                     AddGlassClamp(drawing, metal, end.X, b.X, b.Y + level, -direction);
                 }
             }
-            else
+            else if (showFixings)
             {
                 foreach (double t in new[] { 0.25, 0.75 })
                 {
                     Point2 point = a + (b - a) * t;
                     AddGlassTopBracket(drawing, metal, p, point, slope);
                     var band = ConcreteBand(drawing, p, point.X, point.Y);
-                    if (p.GlassOptions.Mount == GlassMountType.RecessedChannel)
-                    {
-                        double depth = Math.Min(80, p.WaistSlabThickness * 0.55);
-                        AddAnchor(drawing, point.X, band.Item2 + 8, Math.Max(band.Item1 + 8, band.Item2 - depth - 25));
-                    }
-                    else
+                    if (p.GlassOptions.Mount != GlassMountType.RecessedChannel)
                     {
                         double radius = Math.Min(25, Math.Max(5, (band.Item2 - band.Item1 - 12) * 0.24));
                         double center = (band.Item1 + band.Item2) * 0.5;
@@ -139,11 +136,6 @@ namespace StairDrawer.Geometry
             AddIronBoxPost(metal, at.X - half, at.Y + 10, at.X + half, at.Y + 10,
                 at.Y + p.RailingHeight + slope * half - railHalf,
                 at.Y + p.RailingHeight - slope * half - railHalf, true);
-            foreach (double x in new[] { at.X + forward * 35, at.X + forward * 80 })
-            {
-                var band = ConcreteBand(drawing, p, x, at.Y);
-                AddAnchor(drawing, x, at.Y + 7, Math.Max(band.Item1 + 8, band.Item2 - 60));
-            }
         }
 
         private static void AddGlassClamp(DrawingModel drawing, DrawingModel metal, double postX, double edgeX, double y, double direction)
@@ -171,14 +163,6 @@ namespace StairDrawer.Geometry
             drawing.Circles.Add(new CirclePrimitive(new Point2(x, y), 4, StairLayers.Railing));
         }
 
-        private static void AddAnchor(DrawingModel drawing, double x, double top, double bottom)
-        {
-            if (bottom >= top - 1) bottom = top - 20;
-            drawing.Lines.Add(new LinePrimitive(new Point2(x - 3, top), new Point2(x - 3, bottom), StairLayers.Railing));
-            drawing.Lines.Add(new LinePrimitive(new Point2(x + 3, top), new Point2(x + 3, bottom), StairLayers.Railing));
-            drawing.Circles.Add(new CirclePrimitive(new Point2(x, top - 2), 4, StairLayers.Railing));
-        }
-
         private static Tuple<double, double> ConcreteBand(DrawingModel drawing, StairSectionParameters p, double x, double surface)
         {
             // A visible upper flight has no cut concrete polygon. Never attach its hardware to the lower flight below it.
@@ -204,12 +188,12 @@ namespace StairDrawer.Geometry
             return Tuple.Create(low, high);
         }
 
-        private static void AddGlassTurnFixings(DrawingModel drawing, DrawingModel metal, StairSectionParameters p, FlightLayout lower, FlightLayout upper)
+        private static void AddGlassTurnFixings(DrawingModel drawing, DrawingModel metal, StairSectionParameters p, FlightLayout lower, FlightLayout upper, bool showFixings)
         {
             double x = lower.EndX + GetSectionRailingInset(p);
             double bottom = lower.LandingElevation + p.FinishThickness;
             double top = upper.StartElevation + p.RiserHeight + p.FinishThickness + p.RailingHeight;
-            AddGlassTransverseEdge(drawing, metal, p, x, bottom, top, false);
+            AddGlassTransverseEdge(drawing, metal, p, x, bottom, top, false, showFixings);
         }
 
         private static void AddProjectedTurnConnection(DrawingModel drawing, StairSectionParameters p, FlightLayout lower, FlightLayout upper)
@@ -219,13 +203,13 @@ namespace StairDrawer.Geometry
             Point2 b = GetRailingBasePoint(upper, p, 0) + new Point2(0, p.RailingHeight);
             double x = lower.EndX + GetSectionRailingInset(p);
             AddContinuousMemberOutline(metal, new[] { a, new Point2(x, a.Y), new Point2(x, b.Y), b }, IronHandrailDiameter, true);
-            if (p.RailingType == StairRailingType.Glass) AddGlassTurnFixings(drawing, metal, p, lower, upper);
+            if (p.RailingType == StairRailingType.Glass) AddGlassTurnFixings(drawing, metal, p, lower, upper, false);
             else AddUTurnRailingPosts(metal, p, new[] { lower, upper });
             RailingOutlineGeometry.Append(drawing, metal.Polylines.ToArray(), true);
         }
 
         private static void AddGlassTransverseEdge(DrawingModel drawing, DrawingModel metal, StairSectionParameters p,
-            double x, double bottom, double railTop, bool handrail)
+            double x, double bottom, double railTop, bool handrail, bool showFixings = true)
         {
             double half = p.GlassOptions.Thickness * 0.5;
             bool channel = !p.GlassOptions.HasPosts && p.GlassOptions.Mount == GlassMountType.RecessedChannel;
@@ -239,17 +223,13 @@ namespace StairDrawer.Geometry
             {
                 AddMetalBox(metal, x - 10, bottom, x + 10, railTop - 25);
                 AddMetalBox(metal, x - 40, bottom, x + 40, bottom + 10);
-                AddAnchor(drawing, x - 27, bottom + 7, bottom - 80);
-                AddAnchor(drawing, x + 27, bottom + 7, bottom - 80);
                 foreach (double y in new[] { bottom + 160, railTop - 150 }) AddMetalBox(metal, x - half - 8, y - 15, x + half + 8, y + 15);
             }
-            else if (channel)
+            else if (channel && showFixings)
             {
                 AddMetalBox(metal, x - 25, start - 10, x + 25, bottom);
-                AddAnchor(drawing, x - 15, bottom - 5, start - 30);
-                AddAnchor(drawing, x + 15, bottom - 5, start - 30);
             }
-            else
+            else if (showFixings)
             {
                 var band = ConcreteBand(drawing, p, x, bottom);
                 double radius = Math.Min(25, Math.Max(5, (band.Item2 - band.Item1 - 12) * 0.24));
@@ -257,7 +237,6 @@ namespace StairDrawer.Geometry
                 double spread = p.GlassOptions.Mount == GlassMountType.DoublePad
                     ? Math.Min(80, Math.Max(0, band.Item2 - band.Item1 - radius * 2 - 12)) : 0;
                 AddMetalBox(metal, x - 25, center + spread * 0.5 - radius, x + 25, center + spread * 0.5 + radius);
-                AddAnchor(drawing, x, center + spread * 0.5, band.Item1 + 8);
                 if (spread > 1) AddMetalBox(metal, x - 25, center - spread * 0.5 - radius, x + 25, center - spread * 0.5 + radius);
             }
         }

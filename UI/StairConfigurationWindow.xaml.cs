@@ -408,7 +408,8 @@ namespace StairDrawer.UI
             SecondFlightRisersLabel.Text = turnSteps.HasSteps ? "Số cổ bậc vế trên (B)" : "Số cổ bậc vế 2 (B)";
             SectionLandingLengthRow.Visibility = stairType == StairPlanType.LShape
                 ? Visibility.Collapsed : Visibility.Visible;
-            RailingOptionsPanel.IsEnabled = isPlan ? DrawPlanRailingCheckBox.IsChecked == true : DrawRailingCheckBox.IsChecked == true;
+            RailingOptionsPanel.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
+            RailingOptionsPanel.IsEnabled = !isPlan && DrawRailingCheckBox.IsChecked == true;
             GlassOptionsPanel.Visibility = SelectedRailingType == StairRailingType.Glass ? Visibility.Visible : Visibility.Collapsed;
             GlassMountOptionsPanel.Visibility = FramelessGlassRadioButton.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             RailingHeightRow.Visibility = isPlan ? Visibility.Collapsed : Visibility.Visible;
@@ -527,7 +528,7 @@ namespace StairDrawer.UI
                     values.TurnSteps,
                     values.HasStraightLanding,
                     DrawPlanRailingCheckBox.IsChecked == true,
-                    SelectedSectionCut).WithRailingOptions(SelectedRailingType, SelectedGlassOptions);
+                    SelectedSectionCut);
                 cut = StairSectionCut.FromPlan(parameters);
                 drawing = StairPlanGeometry.Create(parameters);
             }
@@ -1327,8 +1328,7 @@ namespace StairDrawer.UI
                 return false;
             }
 
-            if (SelectedRailingType == StairRailingType.Glass
-                && (isPlan ? DrawPlanRailingCheckBox.IsChecked == true : DrawRailingCheckBox.IsChecked == true)
+            if (!isPlan && SelectedRailingType == StairRailingType.Glass && DrawRailingCheckBox.IsChecked == true
                 && (!TryReadDouble(GlassThicknessTextBox, "Chiều dày kính", 6, 40, out double glassThickness)
                     || !TryReadDouble(GlassPanelGapTextBox, "Khe giữa các tấm kính", 5, 50, out double glassGap))) return false;
 
@@ -1352,7 +1352,7 @@ namespace StairDrawer.UI
                     turnSteps,
                     hasStraightLanding,
                     DrawPlanRailingCheckBox.IsChecked == true,
-                    SelectedSectionCut).WithRailingOptions(SelectedRailingType, SelectedGlassOptions));
+                    SelectedSectionCut));
             }
             else
             {
