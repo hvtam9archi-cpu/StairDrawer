@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Trace = System.Diagnostics.Trace;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
@@ -41,7 +42,7 @@ namespace StairDrawer.Commands
             {
                 var prompt = new PromptSelectionOptions
                 {
-                    MessageForAdding = "\nChọn block hoặc chọn toàn bộ các nét thuộc mặt cắt thang cần trích: ",
+                    MessageForAdding = "\nChọn mặt cắt thang để tự trích bậc thang và mũi bậc (block hoặc các nét thuộc mặt cắt): ",
                     AllowDuplicates = false
                 };
                 PromptSelectionResult selection = document.Editor.GetSelection(prompt);
@@ -59,22 +60,27 @@ namespace StairDrawer.Commands
 
         private static void ExtractDetail(Document document, ObjectId sourceId)
         {
-            var dialog = new StairDetailWindow(StairDetailService.StoneThickness(document.Database, sourceId),
-                document.Database.Dimscale >= 5 ? document.Database.Dimscale : 50,
-                StairDetailService.NextNumber(document.Database));
-            if (Application.ShowModalWindow(dialog) != true) return;
-            double elevation;
-            using (Transaction tx = document.Database.TransactionManager.StartOpenCloseTransaction())
-                elevation = ((BlockReference)tx.GetObject(sourceId, OpenMode.ForRead)).GeometricExtents.MinPoint.Z;
-            var center = new StairDetailCircleJig(dialog.Options.Radius, elevation);
-            if (document.Editor.Drag(center).Status != PromptStatus.OK) return;
-            var destination = new StairDetailCircleJig(dialog.Options.Radius * dialog.Options.Magnification,
-                null, center.Position, dialog.Options.Radius);
-            if (document.Editor.Drag(destination).Status != PromptStatus.OK) return;
-            StairDetailResult result = new StairDetailService().Create(document.Database, sourceId, dialog.Options,
-                center.Position, destination.Position);
-            document.Editor.WriteMessage("\nĐã trích chi tiết {0}: {1} dim, {2} ghi chú vật liệu{3}.",
-                dialog.Options.Number, result.DimensionCount, result.NoteCount, result.UsedCallout ? ", đường nối bằng Callout" : "");
+            StairAutomaticDetailResult result = new StairDetailService().CreateAutomatic(document.Database, sourceId);
+            document.Editor.WriteMessage("\nĐã tự trích chi tiết bậc thang 1:10 và mũi bậc 1:5: {0} dim, {1} ghi chú. Các hình được nhóm và đặt ở khoảng trống bên phải mặt cắt.",
+                result.Details.Sum(d => d.DimensionCount), result.Details.Sum(d => d.NoteCount));
+            try
+            {
+                using (ViewTableRecord view = document.Editor.GetCurrentView())
+                {
+                    Matrix3d display = Matrix3d.PlaneToWorld(view.ViewDirection);
+                    display = Matrix3d.Displacement(view.Target - Point3d.Origin) * display;
+                    display = Matrix3d.Rotation(-view.ViewTwist, view.ViewDirection, view.Target) * display;
+                    Extents3d bounds = result.Bounds; bounds.TransformBy(display.Inverse());
+                    double ratio = view.Height > 0 ? view.Width / view.Height : 1.5;
+                    double width = Math.Max(1, bounds.MaxPoint.X - bounds.MinPoint.X) * 1.12;
+                    double height = Math.Max(1, bounds.MaxPoint.Y - bounds.MinPoint.Y) * 1.12;
+                    if (width / height > ratio) height = width / ratio; else width = height * ratio;
+                    view.Width = width; view.Height = height;
+                    view.CenterPoint = new Point2d((bounds.MinPoint.X + bounds.MaxPoint.X) * .5, (bounds.MinPoint.Y + bounds.MaxPoint.Y) * .5);
+                    document.Editor.SetCurrentView(view);
+                }
+            }
+            catch (System.Exception error) { Trace.TraceWarning("Cannot focus automatic stair details: {0}", error.Message); }
         }
 
         private void ShowConfigurationWindow(
@@ -112,7 +118,7 @@ namespace StairDrawer.Commands
             {
                 ObjectId sourceId = _drawingService.DrawAsBlock(document.Database, drawing, placement, configuration.SectionParameters);
                 _previousConfiguration = configuration;
-                document.Editor.WriteMessage("\nĐã vẽ mặt cắt dạng block; chọn vùng cần phóng chi tiết.");
+                document.Editor.WriteMessage("\nĐã vẽ mặt cắt dạng block; đang tự trích chi tiết bậc thang và mũi bậc.");
                 ExtractDetail(document, sourceId);
                 return;
             }

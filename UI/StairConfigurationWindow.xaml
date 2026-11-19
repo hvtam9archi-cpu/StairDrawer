@@ -520,7 +520,7 @@
                                Foreground="{StaticResource MutedTextBrush}"
                                Text="Nhập thông số, xem preview rồi bấm Vẽ." />
                     <Button x:Name="DrawDetailButton" Grid.Column="1" Content="Vẽ và trích" Visibility="Collapsed"
-                            ToolTip="Vẽ mặt cắt dạng block, sau đó khoanh vùng trích chi tiết bậc hoặc mũi bậc."
+                            ToolTip="Vẽ mặt cắt và tự trích cả chi tiết bậc thang, mũi bậc; tự nhận vị trí và thông số."
                             Style="{StaticResource BaseButton}" Click="OnDrawDetailClicked" />
                     <Button Grid.Column="3"
                             MinWidth="90"

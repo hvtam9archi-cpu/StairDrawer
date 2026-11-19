@@ -13,6 +13,7 @@ internal static class Program
 
     private static void Run()
     {
+        AutomaticDetailChecks.Run();
         var options = new[] { new GlassRailingOptions(),
             new GlassRailingOptions(GlassRailingType.Frameless, GlassMountType.SinglePad),
             new GlassRailingOptions(GlassRailingType.Frameless, GlassMountType.DoublePad),

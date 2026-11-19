@@ -7,6 +7,7 @@ using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.DatabaseServices.Filters;
 using Autodesk.AutoCAD.Geometry;
 using StairDrawer.Models;
+using StairDrawer.Geometry;
 
 namespace StairDrawer.Services
 {
@@ -16,9 +17,11 @@ namespace StairDrawer.Services
         public int DimensionCount { get; set; }
         public int NoteCount { get; set; }
         public bool UsedCallout { get; set; }
+        public IReadOnlyList<ObjectId> DetailEntityIds { get; set; }
+        public IReadOnlyList<ObjectId> SourceEntityIds { get; set; }
     }
 
-    internal sealed class StairDetailService
+    internal sealed partial class StairDetailService
     {
         private const string BoundaryLayer = "STAIR-DETAIL-BOUNDARY";
         private const string AnnotationLayer = "STAIR-DETAIL-NOTE";
@@ -181,6 +184,7 @@ namespace StairDrawer.Services
                 ObjectId textStyle = EnsureTextStyle(database, tx);
                 ObjectId dimStyle = EnsureDimStyle(database, tx, textStyle, options.SourceScale);
                 var space = (BlockTableRecord)tx.GetObject(source.OwnerId, OpenMode.ForWrite);
+                var before = new HashSet<ObjectId>(space.Cast<ObjectId>());
 
                 Vector3d sourceX = Vector3d.XAxis.TransformBy(source.BlockTransform).GetNormal();
                 double angle = Math.Atan2(sourceX.Y, sourceX.X);
@@ -191,6 +195,7 @@ namespace StairDrawer.Services
                         using (var frame = ((Xrecord)tx.GetObject(dictionary.GetAt("STAIRDRAW_SOURCE_FRAME"), OpenMode.ForRead)).Data)
                             angle = (double)frame.AsArray()[0].Value;
                 }
+                angle = options.FrameAngle ?? angle;
                 double rotation = options.Horizontal ? -angle : 0.0;
                 Matrix3d transform = Matrix3d.Displacement(destination - center)
                     * Matrix3d.Rotation(rotation, Vector3d.ZAxis, center) * Matrix3d.Scaling(options.Magnification, center);
@@ -206,7 +211,9 @@ namespace StairDrawer.Services
                 var detailCircle = new Circle(destination, Vector3d.ZAxis, options.Radius * options.Magnification)
                     { Layer = BoundaryLayer, LinetypeScale = paper * 0.5 };
                 Append(space, tx, sourceCircle); Append(space, tx, detailCircle);
+                var beforeBubble = new HashSet<ObjectId>(space.Cast<ObjectId>());
                 AddSourceBubble(space, tx, database, textStyle, options, center, source.GeometricExtents.MaxPoint.X);
+                var sourceAnnotations = new HashSet<ObjectId>(space.Cast<ObjectId>().Where(id => !beforeBubble.Contains(id))) { sourceCircle.ObjectId };
 
                 var result = new StairDetailResult { BlockId = detail.ObjectId };
                 var connectors = new List<Entity>();
@@ -225,6 +232,8 @@ namespace StairDrawer.Services
                 if (options.Dimensions) result.DimensionCount = AddDimensions(space, tx, dimStyle, options, treads, transform, destination, angle + rotation);
                 if (options.Notes) result.NoteCount = AddNotes(space, tx, textStyle, options, pieces, center, destination, transform, angle);
                 AddTitle(space, tx, textStyle, options, destination, connectors);
+                result.SourceEntityIds = sourceAnnotations.ToArray();
+                result.DetailEntityIds = space.Cast<ObjectId>().Where(id => !before.Contains(id) && !sourceAnnotations.Contains(id)).ToArray();
                 tx.Commit();
                 return result;
             }
@@ -278,14 +287,32 @@ namespace StairDrawer.Services
             Vector3d x = new Vector3d(Math.Cos(angle), Math.Sin(angle), 0);
             Vector3d y = Vector3d.ZAxis.CrossProduct(x);
             var points = new List<Tuple<Point3d, double>>();
-            foreach (Piece piece in pieces.Where(p => p.Layer == StairLayers.Finish && p.Points.Count == 5 && p.Closed))
+            var finishes = pieces.Where(p => p.Layer == StairLayers.Finish && p.Closed).ToArray();
+            foreach (Piece piece in finishes)
             {
-                Point3d a = piece.Points[2], b = piece.Points[3];
+                if (!TryTread(piece, out StairDetailTread tread)) continue;
+                Point3d a = new Point3d(tread.TopFront.X, tread.TopFront.Y, piece.Points[0].Z);
+                Point3d b = new Point3d(tread.TopBack.X, tread.TopBack.Y, piece.Points[0].Z);
                 if (Math.Abs((b - a).DotProduct(y)) > 1e-5) continue;
                 double direction = Math.Sign((b - a).DotProduct(x));
                 if (direction == 0) continue;
-                // The common 20 mm nosing is removed from the witness position; no nominal pitch is assumed.
-                Point3d point = a + x * ((direction * 20.0) - (a - piece.Points[0]).DotProduct(x));
+                Point3d point = new Point3d(tread.Nosing.X, tread.Nosing.Y, a.Z) + x * (direction * 20);
+                double bottom = (piece.Points[0] - Point3d.Origin).DotProduct(y);
+                double noseX = (point - Point3d.Origin).DotProduct(x) - direction * 20;
+                double top = (a - Point3d.Origin).DotProduct(y);
+                // Match the actual riser face, including scaled blocks and non-default stone thickness.
+                double best = double.MaxValue;
+                foreach (Piece riser in finishes.Where(p => p.Points.Count == 4))
+                {
+                    double loY = riser.Points.Min(p => (p - Point3d.Origin).DotProduct(y));
+                    double hiY = riser.Points.Max(p => (p - Point3d.Origin).DotProduct(y));
+                    if (hiY - loY < tread.Thickness * 1.2 || Math.Min(Math.Abs(loY - bottom), Math.Abs(hiY - bottom)) > 1e-5) continue;
+                    double face = direction > 0 ? riser.Points.Min(p => (p - Point3d.Origin).DotProduct(x))
+                        : riser.Points.Max(p => (p - Point3d.Origin).DotProduct(x));
+                    double distance = (face - noseX) * direction;
+                    if (distance < 0 || distance > tread.Width * .5 || distance >= best) continue;
+                    best = distance; point = Point3d.Origin + x * face + y * top + Vector3d.ZAxis * a.Z;
+                }
                 if (Distance2d(point, center) < radius * 0.90 && !points.Any(p => Distance2d(p.Item1, point) < 1e-5))
                     points.Add(Tuple.Create(point, direction));
             }
@@ -315,14 +342,14 @@ namespace StairDrawer.Services
                     var dim = new RotatedDimension(angle, a, b,
                         center + x * (((a - center).DotProduct(x) + (b - center).DotProduct(x)) * 0.5) + y * top,
                         "", style) { Layer = DimensionLayer, Dimlfac = 1.0 / options.Magnification };
-                    Append(space, tx, dim); count++;
+                    Append(space, tx, dim); dim.RecomputeDimensionBlock(true); count++;
                 }
                 if (rise > 1e-5)
                 {
                     var dim = new RotatedDimension(angle + Math.PI * 0.5, a, b,
                         center + x * right + y * (((a - center).DotProduct(y) + (b - center).DotProduct(y)) * 0.5),
                         "", style) { Layer = DimensionLayer, Dimlfac = 1.0 / options.Magnification };
-                    Append(space, tx, dim); count++;
+                    Append(space, tx, dim); dim.RecomputeDimensionBlock(true); count++;
                 }
             }
             foreach (Point3d p in points)
@@ -342,7 +369,8 @@ namespace StairDrawer.Services
             var notes = new List<Tuple<Point3d, string>>();
             var finishes = pieces.Where(p => p.Layer == StairLayers.Finish).ToList();
             double dotClearance = options.SourceScale * 0.35 / options.Magnification;
-            AddNoteTarget(notes, finishes.Where(p => p.Points.Count == 5), options.TreadNote, originalCenter, options.Radius, dotClearance);
+            if (options.MaterialThickness.HasValue) dotClearance = Math.Min(dotClearance, options.MaterialThickness.Value * .45);
+            AddNoteTarget(notes, finishes.Where(p => TryTread(p, out StairDetailTread tread)), options.TreadNote, originalCenter, options.Radius, dotClearance);
             Vector3d sourceX = new Vector3d(Math.Cos(sourceAngle), Math.Sin(sourceAngle), 0);
             Vector3d sourceY = Vector3d.ZAxis.CrossProduct(sourceX);
             AddNoteTarget(notes, finishes.Where(p => p.Points.Count == 4
@@ -361,7 +389,7 @@ namespace StairDrawer.Services
                 var label = AddText(space, tx, style, note.Item2, new Point3d(textX, rowY, center.Z), paper * 2.5, paper * 60);
                 double baseline = rowY - label.ActualHeight - paper * 1.0;
                 AddNoteLeader(space, tx, target, new Point3d(textX - paper * 3, baseline, center.Z),
-                    new Point3d(textX + label.ActualWidth, baseline, center.Z), paper);
+                    new Point3d(textX + label.ActualWidth, baseline, center.Z), paper, options.MaterialThickness * options.Magnification * .8);
                 rowY = baseline - paper * 4;
             }
             foreach (var note in concrete)
@@ -372,7 +400,7 @@ namespace StairDrawer.Services
                     new Point3d(center.X + radius * 0.40, noteY, center.Z), paper * 2.5, paper * 60);
                 double baseline = noteY - label.ActualHeight - paper;
                 AddNoteLeader(space, tx, target, new Point3d(center.X + radius * 0.32, baseline, center.Z),
-                    new Point3d(label.Location.X + label.ActualWidth, baseline, center.Z), paper);
+                    new Point3d(label.Location.X + label.ActualWidth, baseline, center.Z), paper, options.MaterialThickness * options.Magnification * .8);
             }
             return notes.Count + concrete.Count;
         }
@@ -404,16 +432,17 @@ namespace StairDrawer.Services
             if (best.HasValue) targets.Add(Tuple.Create(best.Value, text));
         }
 
-        private static void AddNoteLeader(BlockTableRecord space, Transaction tx, Point3d start, Point3d knee, Point3d end, double paper)
+        private static void AddNoteLeader(BlockTableRecord space, Transaction tx, Point3d start, Point3d knee, Point3d end, double paper, double? maxDotDiameter)
         {
             var line = new Polyline(3) { Layer = AnnotationLayer, Elevation = start.Z };
             line.AddVertexAt(0, new Point2d(start.X, start.Y), 0, 0, 0);
             line.AddVertexAt(1, new Point2d(knee.X, knee.Y), 0, 0, 0);
             line.AddVertexAt(2, new Point2d(end.X, end.Y), 0, 0, 0);
             Append(space, tx, line);
-            var dot = new Polyline(2) { Closed = true, Layer = AnnotationLayer, Elevation = start.Z, ConstantWidth = paper * 0.6 };
-            dot.AddVertexAt(0, new Point2d(start.X - paper * 0.3, start.Y), 1, 0, 0);
-            dot.AddVertexAt(1, new Point2d(start.X + paper * 0.3, start.Y), 1, 0, 0);
+            double width = Math.Min(paper * .6, (maxDotDiameter ?? double.MaxValue) * .5);
+            var dot = new Polyline(2) { Closed = true, Layer = AnnotationLayer, Elevation = start.Z, ConstantWidth = width };
+            dot.AddVertexAt(0, new Point2d(start.X - width * .5, start.Y), 1, 0, 0);
+            dot.AddVertexAt(1, new Point2d(start.X + width * .5, start.Y), 1, 0, 0);
             Append(space, tx, dot);
         }
 
@@ -586,6 +615,9 @@ namespace StairDrawer.Services
         }
 
         private static double Distance2d(Point3d a, Point3d b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+        private static bool TryTread(Piece piece, out StairDetailTread tread) => StairDetailTread.TryCreate(
+            piece.Points.Select(p => new Point2(p.X, p.Y)).ToArray(), out tread);
 
         private sealed class Piece
         {

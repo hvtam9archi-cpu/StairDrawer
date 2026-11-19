@@ -90,7 +90,7 @@ namespace StairDrawer.Initialization
             AddButton(source, "STAIRDRAWER_DRAW", "Vẽ thang", CommandNames.Draw,
                 "Vẽ mặt bằng hoặc mặt cắt thang thẳng, chữ L, chữ U.", false);
             AddButton(source, "STAIRDRAWER_DETAIL", "Trích chi tiết", CommandNames.Detail,
-                "Trích chi tiết bậc thang hoặc mũi bậc từ mặt cắt đã có.", true);
+                "Tự nhận vị trí, thông số và trích cả chi tiết bậc thang, mũi bậc từ mặt cắt đã chọn.", true);
             return true;
         }
 

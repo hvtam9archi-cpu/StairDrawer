@@ -11,7 +11,7 @@ Sau khi nạp plugin, mở **TH Tools → Cầu thang** trên ribbon hoặc nh�
 | Icon | Nút trên ribbon | Lệnh | Công dụng |
 | --- | --- | --- | --- |
 | ![Vẽ thang](docs/images/draw-stair.png) | **Vẽ thang** | `STAIRDRAW` | Mở giao diện vẽ mặt bằng hoặc mặt cắt. |
-| ![Trích chi tiết](docs/images/extract-detail.png) | **Trích chi tiết** | `STAIRDETAIL` | Trích bậc thang hoặc mũi bậc từ mặt cắt đã có. |
+| ![Trích chi tiết](docs/images/extract-detail.png) | **Trích chi tiết** | `STAIRDETAIL` | Tự trích cả bậc thang và mũi bậc từ mặt cắt đã có. |
 
 Ribbon dùng chung tab **TH Tools** với TPL (`TH_TOOLS_TAB`). StairDrawer tạo panel riêng **Cầu thang**, giữ nguyên panel của TPL, tự bổ sung lại khi đổi workspace và tránh tạo trùng nút. Có thể dùng StairDrawer độc lập khi chưa cài TPL. Icon vector có kích thước 16/32 px và nằm sẵn trong DLL.
 
@@ -80,7 +80,7 @@ Mẫu kính có tên chuẩn **AR-RROOF** trong AutoCAD, dùng dấu gạch ngan
 4. Điều chỉnh A–A khi cần chọn vị trí cắt và hướng nhìn.
 5. Bấm **Vẽ**, chọn điểm chèn và điểm xác định hướng trục X trong AutoCAD.
 
-Trong chế độ mặt cắt, bấm **Vẽ và trích** để tạo mặt cắt dạng block rồi tiếp tục chọn vùng chi tiết. Esc hủy bước chọn đang thực hiện.
+Trong chế độ mặt cắt, bấm **Vẽ và trích** để tạo mặt cắt dạng block và tự trích cả hai chi tiết sau khi đặt thang. Esc hủy bước chọn đang thực hiện.
 
 ## Trích chi tiết thang
 
@@ -88,22 +88,21 @@ Trong chế độ mặt cắt, bấm **Vẽ và trích** để tạo mặt cắt
 
 1. Chạy `STAIRDETAIL` hoặc bấm **Trích chi tiết**.
 2. Chọn một block mặt cắt, hoặc chọn toàn bộ các nét rời thuộc mặt cắt. Các nét nguồn được giữ nguyên.
-3. Chọn **Bậc thang** hoặc **Mũi bậc**, bán kính vùng trích, tỷ lệ gốc và tỷ lệ chi tiết.
-4. Điền số/tên chi tiết, số tờ nếu có; chỉnh nội dung ghi chú vật liệu, dim và tùy chọn ẩn lan can.
-5. Chọn tâm vùng trích bằng khung tròn khi rê chuột, rồi chọn tâm đặt hình phóng lớn.
+3. Công cụ tự chọn vùng có cấu tạo bị cắt qua và tạo **chi tiết bậc thang 1:10** cùng **chi tiết mũi bậc 1:5**, không mở hộp nhập thông số, không yêu cầu chọn tâm hoặc điểm đặt.
 
-Ví dụ: nguồn **1:60**, chi tiết **1:10** sẽ phóng **6 lần**; dim vẫn ghi kích thước thực. Mũi bậc mặc định dùng tỷ lệ **1:5** và hai ghi chú đá.
+Vị trí trích, bán kính, chiều dày đá, dim, ghi chú và số chi tiết đều được xác định tự động. Hai hình được xếp thành cột ở khoảng trống bên phải mặt cắt, tránh các đối tượng đã có; mỗi hình cùng viền, dim và ghi chú được tạo thành một group để di chuyển. Khung nhìn tự mở rộng để thấy kết quả.
 
-![Chi tiết bậc thang](docs/images/stair-tread-detail.png)
+![Tự trích chi tiết bậc thang và mũi bậc](docs/images/automatic-stair-details.png)
 
-![Chi tiết mũi bậc](docs/images/stair-nosing-detail.png)
+Tỷ lệ nguồn lấy từ `DIMSCALE` trong khoảng 10–1000, mặc định **1:50** khi không có giá trị phù hợp. Ví dụ, nguồn **1:50** được phóng **5 lần** cho chi tiết **1:10** và **10 lần** cho mũi bậc **1:5**; dim luôn ghi kích thước đo trên nguồn. Hình được xoay về phương ngang và ẩn lan can để đọc cấu tạo.
 
 Kết quả gồm block có XClip tròn, viền nét đứt, ký hiệu tại nguồn, số/tên chi tiết, tỷ lệ, dim và ghi chú. Dim lấy từ hình học thực tế, không cố định ở 250 mm. Ghi chú chỉ được tạo khi tìm thấy vật liệu tương ứng trong vùng trích.
 
-- Dim và ghi chú tự động nhận diện đa tuyến trên layer `STAIR-FINISH`, `STAIR-BRICK`, `STAIR-CONCRETE` do StairDrawer tạo. Vùng trích cần chứa ít nhất hai mặt bậc đá để có dim bề rộng/chiều cao.
+- Nhận diện đa tuyến trên layer `STAIR-FINISH`, `STAIR-BRICK`, `STAIR-CONCRETE` do StairDrawer tạo, kể cả khi block xoay, lật hoặc đổi tỷ lệ. Cần có ít nhất hai bậc cắt dọc với đá và gạch xây; công cụ bỏ qua vế chỉ nhìn thấy và thông báo khi mặt cắt không đủ cấu tạo để trích.
+- Chi tiết bậc có dim bề rộng/chiều cao thực và các ghi chú đá, gạch, BTCT. Chi tiết mũi bậc có hai ghi chú đá mặt bậc và cổ bậc; chiều dày lấy từ hình học.
 - Chi tiết giữ hình học tại thời điểm tạo; sau khi sửa mặt cắt nguồn, cần trích lại.
-- Crop được lưu trong DWG và giữ khi copy block chi tiết sang DWG khác. Chọn thêm viền, dim và ghi chú để copy cả bộ trình bày.
-- Tùy chọn **Vẽ đường nối** sử dụng API công khai `CalloutGeometryService.CreateSmartLeader` của Callout đang cài. Khi Callout không có hoặc không tương thích, công cụ dùng đường nối trực tiếp. Callout là tùy chọn, không cần cài để trích chi tiết.
+- Crop được lưu trong DWG và giữ khi copy block chi tiết sang DWG khác. Bật chọn group (`PICKSTYLE` có giá trị 1 hoặc 3) để chọn cả bộ trình bày.
+- Ký hiệu trích được đặt tại nguồn và đánh số tiếp theo các chi tiết đã có. Callout là tùy chọn; không cần cài thêm để dùng luồng trích tự động.
 
 ## Yêu cầu và build
 
@@ -185,15 +184,15 @@ Chạy kiểm tra hình học không cần mở AutoCAD:
 dotnet run --project .\tests\StairDrawer.GeometryChecks\StairDrawer.GeometryChecks.csproj -c Release
 ```
 
-Bộ kiểm tra gồm 144 trường hợp mặt bằng/mặt cắt, đường bao lan can mặt bằng đồng nhất, bỏ neo chìm, ẩn/hiện liên kết theo phần cắt/phần thấy, nối tay vịn U/L, số pad đơn/đôi và việc giữ nguyên cấu hình nguồn.
+Bộ kiểm tra gồm 144 trường hợp mặt bằng/mặt cắt và lan can, cùng 384 trường hợp nhận diện vùng trích tự động khi thay đổi loại thang, chiều dày đá, bề rộng bậc, góc xoay, tỷ lệ và hướng lật.
 
 - `Commands/`: lệnh `STAIRDRAW`, `STAIRDETAIL` và luồng tương tác.
 - `Initialization/`: khởi tạo plugin, ribbon TH Tools và icon vector.
 - `Models/`: thông số thang, vết cắt, bậc chuyển hướng và hình học trung gian.
 - `Geometry/`: dựng mặt bằng, mặt cắt, bậc chéo và xử lý giao nhau của lan can.
-- `Interaction/`: chọn vị trí/hướng vẽ và khung chọn vùng trích.
+- `Interaction/`: chọn vị trí và hướng vẽ thang.
 - `Services/`: tạo đối tượng AutoCAD, hatch, chi tiết trích và kết nối Callout.
-- `UI/`: cửa sổ cấu hình, preview và cửa sổ trích chi tiết.
+- `UI/`: cửa sổ cấu hình và preview thang.
 - `Patterns/`: hatch `M_BTCT.pat` được đóng kèm.
 - `docs/images/`: hình minh họa và icon cho README.
 - `tests/`: kiểm tra hình học chạy độc lập, không được biên dịch vào DLL plugin.

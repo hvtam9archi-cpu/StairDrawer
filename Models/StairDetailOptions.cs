@@ -38,5 +38,16 @@ namespace StairDrawer.Models
         public string RiserNote { get; }
         public string BrickNote { get; }
         public string ConcreteNote { get; }
+        public double? FrameAngle { get; private set; }
+        public double? MaterialThickness { get; private set; }
+
+        public StairDetailOptions WithGeometry(double angle, double thickness)
+        {
+            if (!NumericValidation.IsFinite(angle)) throw new ArgumentOutOfRangeException(nameof(angle));
+            if (!NumericValidation.IsFinite(thickness) || thickness <= 0) throw new ArgumentOutOfRangeException(nameof(thickness));
+            var copy = (StairDetailOptions)MemberwiseClone();
+            copy.FrameAngle = angle; copy.MaterialThickness = thickness;
+            return copy;
+        }
     }
 }
